@@ -1,8 +1,8 @@
 <div align="center">
 
-# 💎 FinRisk
+#  FinRisk
 
-### AI-Powered Credit Risk Assessment & Smart Loan Recommendation System
+### Credit Risk Assessment & Smart Loan Recommendation System
 
 *Score a loan applicant in seconds — predict their risk, decide eligibility, recommend a safe loan amount, and project the year-by-year repayment — all from one dashboard.*
 
@@ -16,7 +16,7 @@
 
 ---
 
-## 🎯 What is this?
+##  What is this?
 
 Banks receive thousands of loan applications a day. Approving a risky borrower loses money; rejecting a good one loses business. **FinRisk** uses machine learning to make that decision fast, consistent, and explainable.
 
@@ -31,7 +31,7 @@ Built on the CIBIL bureau + internal-bank case-study dataset (**51,336 applicant
 
 ---
 
-## 📸 Screenshots
+##  Screenshots
 
 ### Overview — the whole loan book at a glance
 Portfolio KPIs, risk-tier split, and the spread of recommended loan sizes.
@@ -60,23 +60,23 @@ Upload a CSV/Excel of applicants and download every decision, loan, and EMI.
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 | Feature | What it does |
 |---|---|
-| 🧠 **ML risk tiering** | Gradient Boosting classifier predicts the P1–P4 risk tier (99%+ test accuracy) |
-| 💰 **ML loan sizing** | A Random Forest regressor recommends the loan amount, bounded by real lending rules |
-| 🛡️ **Affordability guard (FOIR)** | EMI is kept in the **≤30% ideal zone** so basic needs & savings stay untouched; weaker credit history → smaller loan |
-| 📉 **Year-by-year repayment** | See principal paid, interest paid, and debt remaining each year |
-| 🎚️ **Payoff simulator** | Drag the yearly payment and watch the payoff period and total interest change live |
-| 🔀 **Model selector** | Switch between trained models and compare how each one decides the same applicant |
-| 📊 **Portfolio insights** | Decision curves, segment approval rates, and interest-income exposure |
-| 📥 **Batch scoring** | Score hundreds of applicants from one upload and export the results |
-| 🗣️ **Plain-language UI** | No banking jargon — labels anyone can read |
+|  **ML risk tiering** | Gradient Boosting classifier predicts the P1–P4 risk tier (99%+ test accuracy) |
+|  **ML loan sizing** | A Random Forest regressor recommends the loan amount, bounded by real lending rules |
+|  **Affordability guard (FOIR)** | EMI is kept in the **≤30% ideal zone** so basic needs & savings stay untouched; weaker credit history → smaller loan |
+|  **Year-by-year repayment** | See principal paid, interest paid, and debt remaining each year |
+|  **Payoff simulator** | Drag the yearly payment and watch the payoff period and total interest change live |
+|  **Model selector** | Switch between trained models and compare how each one decides the same applicant |
+|  **Portfolio insights** | Decision curves, segment approval rates, and interest-income exposure |
+|  **Batch scoring** | Score hundreds of applicants from one upload and export the results |
+|  **Plain-language UI** | No banking jargon — labels anyone can read |
 
 ---
 
-## 🔬 How it works (the machine learning)
+##  How it works (the machine learning)
 
 Everything is built in four notebooks that run in order:
 
@@ -91,7 +91,7 @@ Everything is built in four notebooks that run in order:
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 **Python** · **pandas** / **numpy** (data) · **scikit-learn** (ML) · **matplotlib** / **seaborn** (charts) · **scipy** (stats) · **Flask** + Jinja2 + HTML/CSS (dashboard) · **Jupyter** (notebooks) · **openpyxl** (Excel I/O)
 
@@ -99,7 +99,7 @@ No heavy frameworks, no CDN — a clean, self-contained data-science + Flask sta
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 FinRisk/
@@ -117,7 +117,7 @@ FinRisk/
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ```bash
 # 1. Install dependencies
@@ -137,7 +137,7 @@ Then open **http://localhost:5000**.
 
 ---
 
-## ⚖️ An honest note
+##  An honest note
 
 The risk tier in this public case-study dataset is largely defined by credit-score bands, so the headline accuracy is high partly because the target is nearly a function of one feature. In a real deployment you'd predict **probability of default** from actual repayment outcomes and validate on AUC/KS/Gini. This project is a strong, end-to-end **demonstration** of the data-science + product workflow, not a drop-in production underwriting engine.
 
