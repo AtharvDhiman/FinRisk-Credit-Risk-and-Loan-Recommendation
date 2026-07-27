@@ -11,6 +11,7 @@
 </section>
 
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+{% if warning %}<div class="alert">⚠ {{ warning }}</div>{% endif %}
 
 <div class="two-col wide-left">
   <section class="panel">
@@ -54,7 +55,7 @@
   <table class="data">
     <thead>
       <tr><th>Row</th><th>Credit Score</th><th>Income</th><th>Tier</th><th>Decision</th>
-          <th>Confidence</th><th>Recommended Loan</th><th>EMI</th><th>Reason</th></tr>
+          <th>Confidence</th><th>Recommended Loan</th><th>EMI</th><th>Reason</th><th></th></tr>
     </thead>
     <tbody>
       {% for r in results %}
@@ -68,6 +69,7 @@
         <td class="num">{{ r.Recommended_Loan | inr }}</td>
         <td class="num">{{ r.Monthly_EMI | inr }}</td>
         <td class="reason-cell">{{ r.Reason }}</td>
+        <td><a class="btn ghost sm" href="{{ url_for('batch_applicant', row=r.Row) }}">View →</a></td>
       </tr>
       {% endfor %}
     </tbody>

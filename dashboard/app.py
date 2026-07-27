@@ -21,6 +21,7 @@ import pipeline as pl
 app = Flask(__name__)
 
 BATCH_RESULT_PATH = os.path.join(pl.DATA_DIR, "last_batch_results.csv")
+BATCH_INPUTS_PATH = os.path.join(pl.DATA_DIR, "last_batch_inputs.csv")
 
 
 @app.context_processor
@@ -94,7 +95,7 @@ def insights():
 
 @app.route("/batch", methods=["GET", "POST"])
 def batch():
-    results = summary = error = None
+    results = summary = error = warning = None
     if request.method == "POST":
         file = request.files.get("file")
         if not file or file.filename == "":
@@ -105,7 +106,9 @@ def batch():
                     df_in = pd.read_excel(file)
                 else:
                     df_in = pd.read_csv(file)
-                res = pl.score_batch(df_in)
+                out = pl.score_batch(df_in)
+                res, missing = out["results"], out["missing"]
+                out["inputs"].to_csv(BATCH_INPUTS_PATH, index=False)
                 res.to_csv(BATCH_RESULT_PATH, index=False)
                 approved = res["Decision"] == "Approved"
                 summary = {
@@ -116,10 +119,34 @@ def batch():
                     "total_book": int(res.loc[approved, "Recommended_Loan"].sum()),
                 }
                 results = res.head(200).to_dict("records")
+                # warn if columns didn't match (why every row would look identical)
+                if missing:
+                    key = [m for m in ("Credit_Score", "NETMONTHLYINCOME") if m in missing]
+                    warning = (f"{len(missing)} expected column(s) were not found in your file and "
+                               f"were filled with the dataset median: {', '.join(missing)}.")
+                    if key:
+                        warning = ("Your file is missing the key column(s) "
+                                   f"{', '.join(key)}, so applicants may show identical results. "
+                                   "Rename your columns to match the template (or download the "
+                                   "blank template below). " + warning)
             except Exception as exc:
                 error = f"Could not process that file: {exc}"
     return render_template("batch.html", results=results, summary=summary,
-                           error=error, cols=pl.BATCH_TEMPLATE_COLS)
+                           error=error, warning=warning, cols=pl.BATCH_TEMPLATE_COLS)
+
+
+@app.route("/batch/applicant/<int:row>")
+def batch_applicant(row):
+    if not os.path.exists(BATCH_INPUTS_PATH):
+        abort(404)
+    inputs_df = pd.read_csv(BATCH_INPUTS_PATH)
+    if row < 1 or row > len(inputs_df):
+        abort(404)
+    inputs = inputs_df.iloc[row - 1].to_dict()
+    result = pl.score_applicant(inputs)
+    max_total = max((r["total_paid"] for r in result["schedule"]), default=1) or 1
+    return render_template("batch_applicant.html", result=result, row=row,
+                           inputs=inputs, fields=pl.FORM_FIELDS, max_total=max_total)
 
 
 @app.route("/batch/template")
@@ -185,4 +212,6 @@ def inr_compact(value):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)

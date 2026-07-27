@@ -28,8 +28,6 @@ def _p(*parts):
 # ---------------------------------------------------------------------------
 # Load models + reference data once
 # ---------------------------------------------------------------------------
-CLASSIFIER = joblib.load(_p(MODELS_DIR, "risk_tier_classifier.joblib"))
-REGRESSOR = joblib.load(_p(MODELS_DIR, "loan_amount_regressor.joblib"))
 FEATURE_COLS = joblib.load(_p(MODELS_DIR, "feature_columns.joblib"))
 ENCODERS = joblib.load(_p(MODELS_DIR, "label_encoders.joblib"))
 
@@ -54,6 +52,12 @@ REGRESSORS = _load_registry(_REG_NAMES, "reg")
 # Defaults = the best models (first row of the comparison reports)
 DEFAULT_CLF_NAME = pd.read_csv(_p(REPORTS_DIR, "classifier_comparison.csv")).iloc[0]["Model"]
 DEFAULT_REG_NAME = pd.read_csv(_p(REPORTS_DIR, "regressor_comparison.csv")).iloc[0]["Model"]
+
+# The primary models REUSE the registry objects (no second copy loaded into RAM --
+# the best RF regressor was previously loaded twice, ~69 MB wasted). Fall back to the
+# standalone "best" files only if the registry is unavailable.
+CLASSIFIER = CLASSIFIERS.get(DEFAULT_CLF_NAME) or joblib.load(_p(MODELS_DIR, "risk_tier_classifier.joblib"))
+REGRESSOR = REGRESSORS.get(DEFAULT_REG_NAME) or joblib.load(_p(MODELS_DIR, "loan_amount_regressor.joblib"))
 
 FEATURED = pd.read_csv(_p(DATA_DIR, "featured_dataset.csv"))
 
@@ -566,6 +570,44 @@ def insights_data():
 BATCH_TEMPLATE_COLS = [name for name, *_ in FORM_FIELDS]
 MAX_BATCH_ROWS = 2000
 
+# Precompute the median of each driver column ONCE (was recomputed per-row before).
+FORM_FIELD_MEDIANS = {name: float(FEATURED[name].median()) for name, *_ in FORM_FIELDS}
+
+# Accepted alternate header names (normalized) so uploads don't have to match exactly.
+_COLUMN_ALIASES = {
+    "Credit_Score": ["creditscore", "cibil", "cibilscore", "credit", "score"],
+    "NETMONTHLYINCOME": ["netmonthlyincome", "monthlyincome", "income", "salary",
+                          "netincome", "takehomeincome", "monthlysalary", "monthlytakehomeincome"],
+    "AGE": ["age"],
+    "Total_TL": ["totaltl", "totalloans", "totaltradelines", "totalcreditcards", "totalaccounts"],
+    "Tot_Active_TL": ["totactivetl", "activetl", "activeloans", "activetradelines", "activeaccounts"],
+    "Tot_Missed_Pmnt": ["totmissedpmnt", "missedpayments", "missedpmnt", "missedpayment", "missed"],
+    "num_times_delinquent": ["numtimesdelinquent", "timesdelinquent", "delinquent", "delinquency"],
+    "num_times_30p_dpd": ["numtimes30pdpd", "times30dpd", "30dpd", "dpd30", "times30dayslate"],
+    "Age_Oldest_TL": ["ageoldesttl", "oldesttl", "ageoldestloan", "oldestaccountage"],
+    "enq_L3m": ["enql3m", "enquiriesl3m", "enquiries", "enq3m", "creditenquiries",
+                "newapplications", "inquiries"],
+    "Time_With_Curr_Empr": ["timewithcurrempr", "timewithcurrentemployer", "employmentmonths",
+                            "jobmonths", "timeatcurrentjob", "tenurejob", "monthsemployed"],
+}
+
+
+def _norm(s):
+    return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+
+def _resolve_columns(df):
+    """Map each expected driver field to a column in the uploaded file, tolerant of
+    case / underscores / common aliases. Returns {field: matched_column_or_None}."""
+    norm_to_col = {}
+    for c in df.columns:
+        norm_to_col.setdefault(_norm(c), c)
+    resolved = {}
+    for name, *_ in FORM_FIELDS:
+        accepted = {_norm(name)} | set(_COLUMN_ALIASES.get(name, []))
+        resolved[name] = next((norm_to_col[a] for a in accepted if a in norm_to_col), None)
+    return resolved
+
 
 def batch_template_df():
     """A blank template with one example row for users to fill in."""
@@ -574,33 +616,114 @@ def batch_template_df():
 
 
 def score_batch(df_in):
-    """Score every row of an uploaded applicant file. Missing driver columns are
-    filled from the dataset median, so partial files still work."""
+    """Score every row of an uploaded applicant file -- fully vectorized so the whole
+    file is run through each model in a single predict() call (not row-by-row).
+    Missing driver columns fall back to the dataset median."""
     df = df_in.head(MAX_BATCH_ROWS).copy()
-    results = []
-    for idx, r in df.iterrows():
-        inputs = {}
-        for name, *_ in FORM_FIELDS:
-            val = r.get(name, None)
-            try:
-                val = float(val)
-                if pd.isna(val):
-                    raise ValueError
-            except (ValueError, TypeError):
-                val = float(FEATURED[name].median())
-            inputs[name] = val
-        res = score_applicant(inputs)
-        results.append({
-            "Row": int(idx) + 1,
-            "Credit_Score": int(inputs["Credit_Score"]),
-            "Net_Monthly_Income": int(inputs["NETMONTHLYINCOME"]),
-            "Predicted_Tier": res["tier"],
-            "Decision": "Approved" if res["eligible"] else "Rejected",
-            "Confidence_%": res["confidence"],
-            "Recommended_Loan": res["loan_amount"],
-            "Interest_Rate_%": res["interest_rate"],
-            "Tenure_Years": res["tenure_years"],
-            "Monthly_EMI": res["monthly_emi"],
-            "Reason": res["reason"],
-        })
-    return pd.DataFrame(results)
+    n = len(df)
+    empty_cols = ["Row", "Credit_Score", "Net_Monthly_Income", "Predicted_Tier", "Decision",
+                  "Confidence_%", "Recommended_Loan", "Interest_Rate_%", "Tenure_Years",
+                  "Monthly_EMI", "Reason"]
+    if n == 0:
+        return {"results": pd.DataFrame(columns=empty_cols),
+                "inputs": pd.DataFrame(columns=[f[0] for f in FORM_FIELDS]),
+                "missing": [f[0] for f in FORM_FIELDS]}
+
+    # 1. Resolve columns (case/alias tolerant), then clean each driver column at once
+    colmap = _resolve_columns(df)
+    missing = [name for name, *_ in FORM_FIELDS if colmap[name] is None]
+    d = {}
+    for name, *_ in FORM_FIELDS:
+        src = colmap[name]
+        col = pd.to_numeric(df[src], errors="coerce") if src is not None else pd.Series(np.nan, index=df.index)
+        d[name] = col.fillna(FORM_FIELD_MEDIANS[name]).to_numpy(dtype=float)
+    inputs_df = pd.DataFrame({name: d[name] for name, *_ in FORM_FIELDS})
+
+    income = d["NETMONTHLYINCOME"]
+    income_capped = np.clip(income, INCOME_LOW, INCOME_HIGH)
+    active_tl = d["Tot_Active_TL"]
+    total_tl = d["Total_TL"]
+    tot_missed = d["Tot_Missed_Pmnt"]
+    income_tl_ratio = np.round(income_capped / np.where(active_tl > 0, active_tl, 1), 2)
+
+    # Credit_Health_Score, vectorized (same formula as the scalar version)
+    pay_ratio = 1 - (tot_missed / np.where(total_tl > 0, total_tl, 1))
+    positive = (0.5 * _mm(d["Credit_Score"], "Credit_Score")
+                + 0.3 * _mm(d["Age_Oldest_TL"], "Age_Oldest_TL")
+                + 0.2 * _mm(pay_ratio, "pay_ratio"))
+    negative = (0.4 * _mm(tot_missed, "Tot_Missed_Pmnt")
+                + 0.35 * _mm(d["num_times_delinquent"], "num_times_delinquent")
+                + 0.25 * _mm(d["num_times_30p_dpd"], "num_times_30p_dpd"))
+    chs = np.round(np.maximum(positive - 0.5 * negative, 0.0) * 100, 2)
+
+    # 2. Build the full feature matrix for ALL rows (medians, then override drivers)
+    X = pd.DataFrame(np.tile([FEATURE_MEDIANS[c] for c in FEATURE_COLS], (n, 1)),
+                     columns=FEATURE_COLS)
+    overrides = {
+        "Credit_Score": d["Credit_Score"], "NETMONTHLYINCOME_Capped": income_capped,
+        "AGE": d["AGE"], "Total_TL": total_tl, "Tot_Active_TL": active_tl,
+        "Tot_Missed_Pmnt": tot_missed, "num_times_delinquent": d["num_times_delinquent"],
+        "num_times_30p_dpd": d["num_times_30p_dpd"], "Age_Oldest_TL": d["Age_Oldest_TL"],
+        "enq_L3m": d["enq_L3m"], "Time_With_Curr_Empr": d["Time_With_Curr_Empr"],
+        "Income_TL_Ratio": income_tl_ratio, "Credit_Health_Score": chs,
+    }
+    for col, vals in overrides.items():
+        if col in X.columns:
+            X[col] = vals
+
+    # 3. ONE predict() per model on the whole batch
+    tiers = CLASSIFIER.predict(X).astype(str)
+    confidence = np.round(CLASSIFIER.predict_proba(X).max(axis=1) * 100, 1)
+    raw_amount = np.maximum(REGRESSOR.predict(X), 0.0)
+
+    # 4. Per-tier rule arrays
+    rate = np.array([float(TIER_RULES.loc[t, "Interest_Rate_Pct"]) for t in tiers])
+    tenure = np.array([int(TIER_RULES.loc[t, "Tenure_Years"]) for t in tiers])
+    max_loan = np.array([float(TIER_RULES.loc[t, "Max_Loan_Amount"]) for t in tiers])
+    eligible = np.isin(tiers, ["P1", "P2", "P3"])
+
+    # 5. Loan amount = min(regressor, tier cap, risk-adjusted affordability)
+    risk_adj = np.clip(0.6 + 0.4 * (chs / 100.0), 0.6, 1.0)
+    r_m = (rate / 100.0) / 12.0
+    n_m = tenure * 12
+    with np.errstate(divide="ignore", invalid="ignore"):
+        annuity = ((1 + r_m) ** n_m - 1) / (r_m * (1 + r_m) ** n_m)
+    affordable = np.where(income > 0, IDEAL_FOIR * income * annuity, 0.0) * risk_adj
+    loan = np.round(np.minimum(np.minimum(raw_amount, max_loan), affordable), -2)
+    loan = np.where(eligible, loan, 0.0)
+
+    # minimum-viable-loan gate
+    too_low = eligible & (loan < MIN_VIABLE_LOAN)
+    eligible = eligible & ~too_low
+    loan = np.where(eligible, loan, 0.0)
+
+    # 6. EMI (vectorized)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        emi = loan * r_m * (1 + r_m) ** n_m / ((1 + r_m) ** n_m - 1)
+    emi = np.where(eligible & (loan > 0), np.round(emi), 0).astype(int)
+
+    # 7. Reasons (text only -- cheap loop, no model calls)
+    reasons = []
+    for i in range(n):
+        if too_low[i]:
+            reasons.append(f"Would qualify (tier {tiers[i]}), but income Rs.{income[i]:,.0f}/mo "
+                           f"is too low for the minimum Rs.{MIN_VIABLE_LOAN:,} loan")
+        else:
+            reasons.append(build_reason(tiers[i], d["Credit_Score"][i], income_capped[i],
+                                        tot_missed[i], d["num_times_delinquent"][i],
+                                        d["Age_Oldest_TL"][i], d["enq_L3m"][i]))
+
+    results = pd.DataFrame({
+        "Row": np.arange(1, n + 1),
+        "Credit_Score": d["Credit_Score"].astype(int),
+        "Net_Monthly_Income": income.astype(int),
+        "Predicted_Tier": tiers,
+        "Decision": np.where(eligible, "Approved", "Rejected"),
+        "Confidence_%": confidence,
+        "Recommended_Loan": loan,
+        "Interest_Rate_%": np.where(eligible, rate, 0),
+        "Tenure_Years": np.where(eligible, tenure, 0),
+        "Monthly_EMI": emi,
+        "Reason": reasons,
+    })
+    return {"results": results, "inputs": inputs_df, "missing": missing}

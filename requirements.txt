@@ -8,3 +8,4 @@ joblib
 openpyxl
 jupyter
 flask
+gunicorn
