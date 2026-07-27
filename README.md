@@ -1,4 +1,4 @@
-# AI-Powered Credit Risk Assessment & Smart Loan Recommendation System
+# Credit Risk Assessment & Smart Loan Recommendation System
 
 Predicts whether a bank customer is eligible for a loan from their banking +
 CIBIL bureau history, recommends a loan amount/tenure/repayment method, and
