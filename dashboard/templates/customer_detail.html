@@ -50,36 +50,36 @@
     </section>
 
     <section class="panel">
-      <h2>Year-by-year repayment</h2>
-      <div class="schedule">
-        {% for row in data.schedule %}
-        <div class="sched-year">
-          <div class="sched-head">
-            <span>Year {{ row.Year }}</span>
-            <span class="muted">Outstanding: {{ row.Outstanding_Balance | inr }}</span>
-          </div>
-          <div class="stack-bar">
-            <div class="seg principal" style="width: {{ (row.Principal_Paid / max_total * 100) }}%"
-                 title="Principal {{ row.Principal_Paid | inr }}"></div>
-            <div class="seg interest" style="width: {{ (row.Interest_Paid / max_total * 100) }}%"
-                 title="Interest {{ row.Interest_Paid | inr }}"></div>
-          </div>
-          <div class="sched-legend muted">
-            Paid {{ row.Total_Paid_Year | inr }}
-            (principal {{ row.Principal_Paid | inr }} + interest {{ row.Interest_Paid | inr }})
-          </div>
+      <h2>Debt payoff simulator</h2>
+      <p class="muted" style="margin-top:-4px">Drag the yearly payment to see how many years it
+         takes to clear the debt and what's left each year. Paying less each year means more
+         years — and more total interest. The scheduled EMI clears it in {{ loan.Tenure_Years }} years.</p>
+      <div id="payoff"
+           data-principal="{{ loan.Recommended_Loan_Amount }}"
+           data-rate="{{ loan.Interest_Rate_Pct }}"
+           data-income="{{ app.NETMONTHLYINCOME }}"
+           data-foir="{{ loan.FOIR_Limit }}"
+           data-emi="{{ loan.Monthly_EMI }}"
+           data-tenure="{{ loan.Tenure_Years }}">
+        <div class="payoff-control">
+          <label>
+            <span>Yearly payment: <b id="pay-label"></b> <span class="muted" id="pay-emi"></span></span>
+            <input type="range" id="pay-slider">
+          </label>
         </div>
-        {% endfor %}
+        <div id="payoff-summary" class="payoff-summary"></div>
+        <div id="payoff-years" class="schedule"></div>
         <div class="legend-key">
           <span><i class="swatch principal"></i> Principal</span>
           <span><i class="swatch interest"></i> Interest</span>
         </div>
       </div>
+      <script src="{{ url_for('static', filename='payoff.js') }}?v={{ asset_version }}"></script>
     </section>
   </div>
 
   <section class="panel">
-    <h2>Full repayment table</h2>
+    <h2>Scheduled repayment <span class="muted">(paying the full EMI on time — clears in {{ loan.Tenure_Years }} years)</span></h2>
     <div class="table-wrap">
     <table class="data">
       <thead>

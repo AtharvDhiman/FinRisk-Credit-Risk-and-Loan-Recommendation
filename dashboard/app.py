@@ -7,8 +7,14 @@ then open http://localhost:5000
 """
 import os
 import pandas as pd
-from flask import (Flask, render_template, request, send_from_directory, abort,
-                   Response)
+from flask import (
+    Flask,
+    render_template,
+    request,
+    send_from_directory,
+    abort,
+    Response,
+)
 
 import pipeline as pl
 
@@ -19,11 +25,13 @@ BATCH_RESULT_PATH = os.path.join(pl.DATA_DIR, "last_batch_results.csv")
 
 @app.context_processor
 def inject_asset_version():
-    """Cache-busting token so browsers reload style.css whenever it changes."""
-    try:
-        v = int(os.path.getmtime(os.path.join(app.static_folder, "style.css")))
-    except OSError:
-        v = 0
+    """Cache-busting token so browsers reload static assets whenever they change."""
+    v = 0
+    for fname in ("style.css", "payoff.js"):
+        try:
+            v = max(v, int(os.path.getmtime(os.path.join(app.static_folder, fname))))
+        except OSError:
+            pass
     return {"asset_version": v}
 
 
