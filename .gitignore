@@ -1,0 +1,30 @@
+# Virtual environments
+venv/
+.venv/
+.venv-1/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Tooling / editor
+.claude/
+.vscode/
+.idea/
+
+# Large regenerable artifacts (recreated by running the notebooks) --------------
+# Trained models (run notebooks 02-03 to regenerate)
+models/*.joblib
+
+# Processed data (run notebooks 02-04 to regenerate from data/raw)
+data/processed/
+reports/eligible_customers.csv
+dashboard/data/last_batch_results.csv
+
+# OS
+.DS_Store
+Thumbs.db

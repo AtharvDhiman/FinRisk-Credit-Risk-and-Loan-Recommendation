@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% set active = 'predict' %}
+{% block title %}Live Prediction{% endblock %}
+{% block content %}
+
+<section class="hero compact">
+  <h1>Live loan-eligibility prediction</h1>
+  <p>Enter an applicant's profile. The trained model predicts their risk tier and
+     confidence, and (if eligible) recommends a loan amount, EMI and repayment plan
+     in real time. Fields you leave at their defaults are filled from the dataset median.</p>
+</section>
+
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+<div class="two-col wide-left">
+  <section class="panel">
+    <h2>Applicant profile</h2>
+    <form method="post" class="predict-form">
+      <div class="model-select">
+        <label>
+          <span>AI model — approve / reject decision</span>
+          <select name="clf_name">
+            {% for c in choices.classifiers %}
+            <option value="{{ c.name }}" {{ 'selected' if c.name == clf_name }}>{{ c.name }} · {{ c.metric }}{{ ' · best' if c.is_default }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>AI model — loan amount</span>
+          <select name="reg_name">
+            {% for r in choices.regressors %}
+            <option value="{{ r.name }}" {{ 'selected' if r.name == reg_name }}>{{ r.name }} · {{ r.metric }}{{ ' · best' if r.is_default }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      {% for name, label, mn, mx, default in fields %}
+      <label>
+        <span>{{ label }}</span>
+        <input type="number" step="any" name="{{ name }}"
+               min="{{ mn }}" max="{{ mx }}"
+               value="{{ values[name] }}" required>
+      </label>
+      {% endfor %}
+      <button type="submit" class="btn primary full">Predict eligibility</button>
+    </form>
+  </section>
+
+  <section class="panel result-panel">
+    {% if result %}
+      <div class="verdict {{ 'ok' if result.eligible else 'bad' }}">
+        <div class="verdict-tier">
+          <span class="pill tier-{{ result.tier }} lg">{{ result.tier }}</span>
+          <div>
+            <strong>{{ result.tier_label }}</strong>
+            <div class="muted">{{ result.eligibility_status }} · {{ result.confidence }}% model confidence</div>
+          </div>
+        </div>
+        <div class="verdict-badge">{{ 'ELIGIBLE' if result.eligible else 'NOT ELIGIBLE' }}</div>
+      </div>
+
+      <div class="metric-row">
+        <div><span class="muted">Credit Health Score</span><b>{{ result.credit_health_score }}/100</b></div>
+        <div><span class="muted">Income per active loan/card</span><b>{{ result.income_tl_ratio | inr }}</b></div>
+      </div>
+
+      <p class="reason"><span class="muted">Reason:</span> {{ result.reason }}</p>
+
+      {% if comparison %}
+      <h3>How every model decides this applicant</h3>
+      <p class="muted" style="margin-top:-4px">Result above uses <b>{{ result.clf_used }}</b>
+         (+ {{ result.reg_used }} for the amount). Pick a different model in the form and
+         re-run to make it active. At clear-cut profiles all models agree; near the cutoff
+         they can differ — and low confidence flags an uncertain call.</p>
+      <div class="table-wrap">
+      <table class="data compare">
+        <thead><tr><th>Classifier</th><th>Tier</th><th>Decision</th><th>Confidence</th></tr></thead>
+        <tbody>
+        {% for m in comparison %}
+        <tr class="{{ 'best' if m.model == result.clf_used }}">
+          <td>{{ m.model }}{{ ' ★' if m.is_default }}</td>
+          <td><span class="pill tier-{{ m.tier }}">{{ m.tier }}</span></td>
+          <td class="{{ 'approved-cell' if m.eligible else 'rejected-cell' }}">{{ m.decision }}</td>
+          <td class="num">{{ m.confidence }}%</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+
+      {% if result.eligible %}
+      <div class="loan-summary">
+        <div class="loan-amt">
+          <span class="muted">Recommended loan</span>
+          <div class="big">{{ result.loan_amount | inr }}</div>
+        </div>
+        <table class="mini">
+          <tr><td>Interest rate</td><td>{{ result.interest_rate }}% p.a.</td></tr>
+          <tr><td>Tenure</td><td>{{ result.tenure_years }} years</td></tr>
+          <tr><td>Repayment method</td><td>{{ result.repayment_method }}</td></tr>
+          <tr><td>Monthly EMI</td><td>{{ result.monthly_emi | inr }}</td></tr>
+          <tr><td>EMI as share of income</td>
+              <td>{{ result.emi_to_income }}% <span class="zone-tag {{ result.foir_zone_cls }}">{{ result.foir_zone }}</span></td></tr>
+          <tr><td>Total interest payable</td><td>{{ result.total_interest | inr }}</td></tr>
+          <tr><td>Total amount payable</td><td>{{ result.total_payable | inr }}</td></tr>
+        </table>
+        <p class="affordability {{ 'ok' if result.emi_to_income <= 30 else 'warn' }}">
+          {% if result.emi_to_income <= 30 %}
+            ✓ Ideal zone — the {{ result.monthly_emi | inr }} EMI takes {{ result.emi_to_income }}%
+            of the {{ result.net_income | inr }} monthly income (within the 30% safe zone), so basic
+            needs and monthly savings stay unaffected.
+          {% else %}
+            ⚠ The {{ result.monthly_emi | inr }} EMI is {{ result.emi_to_income }}% of income — above
+            the 30% ideal zone.
+          {% endif %}
+        </p>
+      </div>
+
+      <h3>Debt payoff simulator</h3>
+      <p class="muted" style="margin-top:-4px">Drag the yearly payment to see how many years it
+         takes to clear the debt and what's left each year. Paying less each year means more
+         years — and more total interest. The scheduled EMI clears it in {{ result.tenure_years }} years.</p>
+
+      <div id="payoff"
+           data-principal="{{ result.loan_amount }}"
+           data-rate="{{ result.interest_rate }}"
+           data-income="{{ result.net_income }}"
+           data-foir="{{ result.foir_limit }}"
+           data-emi="{{ result.monthly_emi }}"
+           data-tenure="{{ result.tenure_years }}">
+        <div class="payoff-control">
+          <label>
+            <span>Yearly payment: <b id="pay-label"></b> <span class="muted" id="pay-emi"></span></span>
+            <input type="range" id="pay-slider">
+          </label>
+        </div>
+        <div id="payoff-summary" class="payoff-summary"></div>
+        <div id="payoff-years" class="schedule"></div>
+        <div class="legend-key">
+          <span><i class="swatch principal"></i> Principal</span>
+          <span><i class="swatch interest"></i> Interest</span>
+        </div>
+      </div>
+
+      <script>
+      (function () {
+        var el = document.getElementById('payoff');
+        if (!el) return;
+        var P = +el.dataset.principal, rate = +el.dataset.rate, income = +el.dataset.income,
+            foir = +el.dataset.foir, emi = +el.dataset.emi, tenure = +el.dataset.tenure;
+        var scheduledAnnual = emi * 12;
+        var annualInterest0 = P * (rate / 100);
+        var minPay = Math.max(Math.round(annualInterest0 * 1.12 / 1000) * 1000,
+                              Math.round(scheduledAnnual * 0.4 / 1000) * 1000);
+        if (minPay >= scheduledAnnual) minPay = Math.round(scheduledAnnual * 0.7 / 1000) * 1000;
+        var maxPay = Math.round(scheduledAnnual * 1.6 / 1000) * 1000;
+
+        var slider = document.getElementById('pay-slider');
+        slider.min = minPay; slider.max = maxPay; slider.step = 1000; slider.value = scheduledAnnual;
+
+        function inr(x) {
+          x = Math.round(x); var neg = x < 0; x = Math.abs(x); var s = '' + x;
+          if (s.length > 3) { var last3 = s.slice(-3), rest = s.slice(0, -3), parts = [];
+            while (rest.length > 2) { parts.unshift(rest.slice(-2)); rest = rest.slice(0, -2); }
+            if (rest) parts.unshift(rest); s = parts.join(',') + ',' + last3; }
+          return (neg ? '-Rs.' : 'Rs.') + s;
+        }
+
+        function simulate(annualPayment) {
+          var rM = (rate / 100) / 12, pay = annualPayment / 12, bal = P, month = 0;
+          var years = [], yP = 0, yI = 0, MAX = 40 * 12, totalInterest = 0;
+          if (pay <= bal * rM) return { clears: false };
+          while (bal > 0 && month < MAX) {
+            month++;
+            var interest = bal * rM, principal = pay - interest;
+            if (principal > bal) principal = bal;
+            bal -= principal; yP += principal; yI += interest; totalInterest += interest;
+            if (month % 12 === 0 || bal <= 0) {
+              years.push({ year: Math.ceil(month / 12), principal: yP, interest: yI,
+                           paid: yP + yI, remaining: Math.max(bal, 0) });
+              yP = 0; yI = 0;
+            }
+          }
+          return { clears: bal <= 0, years: years, months: month, totalInterest: totalInterest };
+        }
+
+        function zoneOf(pct) {
+          if (pct <= 30) return { label: 'Ideal', cls: 'ideal' };
+          if (pct <= 40) return { label: 'Moderate', cls: 'moderate' };
+          if (pct <= 50) return { label: 'Caution', cls: 'caution' };
+          return { label: 'High risk', cls: 'high' };
+        }
+
+        function render() {
+          var annual = +slider.value;
+          document.getElementById('pay-label').textContent = inr(annual) + ' / year';
+          var emiPct = (annual / 12) / income * 100;
+          var z = zoneOf(emiPct);
+          var pe = document.getElementById('pay-emi');
+          pe.innerHTML = '(' + (annual / 12 >= 1 ? inr(annual / 12) : 0) + '/mo · ' +
+                         emiPct.toFixed(0) + '% of income · <span class="zone-tag ' + z.cls + '">' +
+                         z.label + '</span>)';
+          pe.className = 'muted';
+
+          var sim = simulate(annual);
+          var summary = document.getElementById('payoff-summary');
+          var box = document.getElementById('payoff-years');
+          if (!sim.clears) {
+            summary.className = 'payoff-summary warn';
+            summary.innerHTML = '&#9888; This payment is too low to ever clear the debt — it barely covers the interest.';
+            box.innerHTML = ''; return;
+          }
+          var yrs = sim.years.length;
+          var extra = yrs > tenure ? ' — ' + (yrs - tenure) + ' year(s) longer than the scheduled ' + tenure
+                     : (yrs < tenure ? ' — ' + (tenure - yrs) + ' year(s) faster than the scheduled ' + tenure : ' — same as the scheduled tenure');
+          summary.className = 'payoff-summary ok';
+          summary.innerHTML = '<b>Debt cleared in ' + yrs + ' year' + (yrs > 1 ? 's' : '') + '</b>' + extra +
+            '. Total interest paid: <b>' + inr(sim.totalInterest) + '</b>. This payment sits in the ' +
+            '<span class="zone-tag ' + z.cls + '">' + z.label + '</span> zone' +
+            (emiPct > 30 ? ' — above the 30% ideal zone, so it starts eating into savings/needs.' : '.');
+
+          var maxPaid = Math.max.apply(null, sim.years.map(function (y) { return y.paid; }));
+          box.innerHTML = sim.years.map(function (y) {
+            return '<div class="sched-year"><div class="sched-head"><span>Year ' + y.year +
+              '</span><span class="muted">Debt left: ' + inr(y.remaining) + '</span></div>' +
+              '<div class="stack-bar"><div class="seg principal" style="width:' + (y.principal / maxPaid * 100) +
+              '%"></div><div class="seg interest" style="width:' + (y.interest / maxPaid * 100) + '%"></div></div>' +
+              '<div class="sched-legend muted">Paid ' + inr(y.paid) + ' (principal ' + inr(y.principal) +
+              ' + interest ' + inr(y.interest) + ')</div></div>';
+          }).join('');
+        }
+
+        slider.addEventListener('input', render);
+        render();
+      })();
+      </script>
+      {% endif %}
+    {% else %}
+      <div class="placeholder">
+        <p>◆</p>
+        <p>Fill the form and hit <b>Predict eligibility</b> to see the model's decision.</p>
+        <p class="muted">Try a strong profile (credit score 780, income 90,000, no missed payments)
+           vs. a weak one (score 600, 3 missed payments, 5 recent enquiries).</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}
