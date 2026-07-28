@@ -39,6 +39,12 @@ def inject_asset_version():
     return {"asset_version": v}
 
 
+@app.route("/favicon.ico")
+@app.route("/favicon.png")
+def favicon():
+    return Response(status=204)
+
+
 @app.route("/")
 def index():
     return render_template("index.html", stats=pl.dashboard_stats(),
