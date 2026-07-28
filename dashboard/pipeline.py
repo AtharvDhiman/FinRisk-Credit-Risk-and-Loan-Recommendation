@@ -37,27 +37,68 @@ _CLF_NAMES = ["Gradient Boosting", "Decision Tree", "Random Forest", "Logistic R
 _REG_NAMES = ["Random Forest Regressor", "Linear Regression"]
 
 
-def _load_registry(names, prefix):
-    reg = {}
-    for name in names:
-        path = _p(MODELS_DIR, f"{prefix}_{name.lower().replace(' ', '_')}.joblib")
-        if os.path.exists(path):
-            reg[name] = joblib.load(path)
-    return reg
+class LazyRegistry(dict):
+    def __init__(self, names, prefix):
+        super().__init__()
+        self.names = names
+        self.prefix = prefix
+
+    def _load(self, key):
+        if key in self.names and key not in self:
+            path = _p(MODELS_DIR, f"{self.prefix}_{key.lower().replace(' ', '_')}.joblib")
+            if os.path.exists(path):
+                self[key] = joblib.load(path)
+
+    def __getitem__(self, key):
+        self._load(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        self._load(key)
+        return super().get(key, default)
+
+    def items(self):
+        for name in self.names:
+            self._load(name)
+        return super().items()
+
+    def values(self):
+        for name in self.names:
+            self._load(name)
+        return super().values()
+
+    def __iter__(self):
+        return iter(self.names)
+
+    def __len__(self):
+        return len(self.names)
+
+    def __contains__(self, key):
+        return key in self.names
 
 
-CLASSIFIERS = _load_registry(_CLF_NAMES, "clf")
-REGRESSORS = _load_registry(_REG_NAMES, "reg")
+CLASSIFIERS = LazyRegistry(_CLF_NAMES, "clf")
+REGRESSORS = LazyRegistry(_REG_NAMES, "reg")
 
 # Defaults = the best models (first row of the comparison reports)
 DEFAULT_CLF_NAME = pd.read_csv(_p(REPORTS_DIR, "classifier_comparison.csv")).iloc[0]["Model"]
 DEFAULT_REG_NAME = pd.read_csv(_p(REPORTS_DIR, "regressor_comparison.csv")).iloc[0]["Model"]
 
-# The primary models REUSE the registry objects (no second copy loaded into RAM --
-# the best RF regressor was previously loaded twice, ~69 MB wasted). Fall back to the
-# standalone "best" files only if the registry is unavailable.
-CLASSIFIER = CLASSIFIERS.get(DEFAULT_CLF_NAME) or joblib.load(_p(MODELS_DIR, "clf_gradient_boosting.joblib"))
-REGRESSOR = REGRESSORS.get(DEFAULT_REG_NAME) or joblib.load(_p(MODELS_DIR, "reg_random_forest_regressor.joblib"))
+
+class _LazyModelProxy:
+    def __init__(self, registry, default_name):
+        self.registry = registry
+        self.default_name = default_name
+
+    def _get_obj(self):
+        return self.registry.get(self.default_name)
+
+    def __getattr__(self, name):
+        return getattr(self._get_obj(), name)
+
+
+CLASSIFIER = _LazyModelProxy(CLASSIFIERS, DEFAULT_CLF_NAME)
+REGRESSOR = _LazyModelProxy(REGRESSORS, DEFAULT_REG_NAME)
 
 FEATURED = pd.read_csv(_p(DATA_DIR, "featured_dataset.csv"))
 
