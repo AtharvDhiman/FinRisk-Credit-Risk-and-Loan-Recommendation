@@ -16,7 +16,10 @@ from flask import (
     Response,
 )
 
-import pipeline as pl
+try:
+    from . import pipeline as pl
+except ImportError:
+    import pipeline as pl
 
 app = Flask(__name__)
 
@@ -108,6 +111,7 @@ def batch():
                     df_in = pd.read_csv(file)
                 out = pl.score_batch(df_in)
                 res, missing = out["results"], out["missing"]
+                os.makedirs(pl.DATA_DIR, exist_ok=True)
                 out["inputs"].to_csv(BATCH_INPUTS_PATH, index=False)
                 res.to_csv(BATCH_RESULT_PATH, index=False)
                 approved = res["Decision"] == "Approved"
