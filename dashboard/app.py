@@ -6,6 +6,7 @@ Run from the project root:
 then open http://localhost:5000
 """
 import os
+import tempfile
 import pandas as pd
 from flask import (
     Flask,
@@ -23,8 +24,11 @@ except ImportError:
 
 app = Flask(__name__)
 
-BATCH_RESULT_PATH = os.path.join(pl.DATA_DIR, "last_batch_results.csv")
-BATCH_INPUTS_PATH = os.path.join(pl.DATA_DIR, "last_batch_inputs.csv")
+# Batch outputs go to the OS temp dir -- it is writable everywhere (the project
+# folder is read-only on serverless hosts like Vercel, which would 500 the upload).
+_TMP = tempfile.gettempdir()
+BATCH_RESULT_PATH = os.path.join(_TMP, "finrisk_last_batch_results.csv")
+BATCH_INPUTS_PATH = os.path.join(_TMP, "finrisk_last_batch_inputs.csv")
 
 
 @app.context_processor
@@ -117,7 +121,6 @@ def batch():
                     df_in = pd.read_csv(file)
                 out = pl.score_batch(df_in)
                 res, missing = out["results"], out["missing"]
-                os.makedirs(pl.DATA_DIR, exist_ok=True)
                 out["inputs"].to_csv(BATCH_INPUTS_PATH, index=False)
                 res.to_csv(BATCH_RESULT_PATH, index=False)
                 approved = res["Decision"] == "Approved"
