@@ -56,8 +56,8 @@ DEFAULT_REG_NAME = pd.read_csv(_p(REPORTS_DIR, "regressor_comparison.csv")).iloc
 # The primary models REUSE the registry objects (no second copy loaded into RAM --
 # the best RF regressor was previously loaded twice, ~69 MB wasted). Fall back to the
 # standalone "best" files only if the registry is unavailable.
-CLASSIFIER = CLASSIFIERS.get(DEFAULT_CLF_NAME) or joblib.load(_p(MODELS_DIR, "risk_tier_classifier.joblib"))
-REGRESSOR = REGRESSORS.get(DEFAULT_REG_NAME) or joblib.load(_p(MODELS_DIR, "loan_amount_regressor.joblib"))
+CLASSIFIER = CLASSIFIERS.get(DEFAULT_CLF_NAME) or joblib.load(_p(MODELS_DIR, "clf_gradient_boosting.joblib"))
+REGRESSOR = REGRESSORS.get(DEFAULT_REG_NAME) or joblib.load(_p(MODELS_DIR, "reg_random_forest_regressor.joblib"))
 
 FEATURED = pd.read_csv(_p(DATA_DIR, "featured_dataset.csv"))
 
