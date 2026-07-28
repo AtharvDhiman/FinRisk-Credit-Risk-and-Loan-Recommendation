@@ -47,11 +47,11 @@ class LazyRegistry(dict):
         self.prefix = prefix
 
     def _load(self, key):
-        if key in self.names and key not in self:
+        if key in self.names and not dict.__contains__(self, key):
             path = _p(MODELS_DIR, f"{self.prefix}_{key.lower().replace(' ', '_')}.joblib")
             if os.path.exists(path):
                 try:
-                    self[key] = joblib.load(path)
+                    dict.__setitem__(self, key, joblib.load(path))
                 except Exception as err:
                     print(f"Warning: Failed to load model {path}: {err}")
 
@@ -72,12 +72,6 @@ class LazyRegistry(dict):
         for name in self.names:
             self._load(name)
         return super().values()
-
-    def __iter__(self):
-        return iter(self.names)
-
-    def __len__(self):
-        return len(self.names)
 
     def __contains__(self, key):
         return key in self.names
