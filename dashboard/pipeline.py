@@ -28,8 +28,11 @@ def _p(*parts):
 # ---------------------------------------------------------------------------
 # Load models + reference data once
 # ---------------------------------------------------------------------------
-FEATURE_COLS = joblib.load(_p(MODELS_DIR, "feature_columns.joblib"))
-ENCODERS = joblib.load(_p(MODELS_DIR, "label_encoders.joblib"))
+try:
+    FEATURE_COLS = joblib.load(_p(MODELS_DIR, "feature_columns.joblib"))
+except Exception:
+    FEATURE_COLS = []
+ENCODERS = None
 
 # Every selectable model (name -> estimator), so the dashboard can let the user
 # switch models and compare. Loaded from the clf_*/reg_* files notebook 03 saves.
@@ -47,7 +50,10 @@ class LazyRegistry(dict):
         if key in self.names and key not in self:
             path = _p(MODELS_DIR, f"{self.prefix}_{key.lower().replace(' ', '_')}.joblib")
             if os.path.exists(path):
-                self[key] = joblib.load(path)
+                try:
+                    self[key] = joblib.load(path)
+                except Exception as err:
+                    print(f"Warning: Failed to load model {path}: {err}")
 
     def __getitem__(self, key):
         self._load(key)
