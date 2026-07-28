@@ -1,5 +1,8 @@
-flask
-pandas
-numpy
-scikit-learn
-joblib
+# Pinned to the versions the models were trained/pickled with. An unpinned
+# scikit-learn/numpy lets the deployed env install a different version, which loads
+# the joblib models fine but then crashes on .predict() (the /predict 500).
+flask==3.1.2
+pandas==2.3.3
+numpy==2.3.5
+scikit-learn==1.7.2
+joblib==1.5.2
