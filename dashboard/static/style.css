@@ -264,6 +264,8 @@ table.compare { margin: 6px 0 14px; }
 .muted { color: var(--muted); }
 .placeholder { text-align: center; color: var(--muted); padding: 40px 20px; }
 .placeholder p:first-child { font-size: 40px; color: var(--accent); margin: 0 0 10px; }
+/* FinRisk logo used as the empty-state placeholder icon (replaces the old diamond) */
+.placeholder-logo { width: 60px; height: 60px; border-radius: 13px; opacity: .9; }
 .alert { background: #fdecea; border: 1px solid #f4c4bf; color: #a52c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
 .back { color: var(--accent); text-decoration: none; font-size: 14px; }
 .back:hover { text-decoration: underline; }

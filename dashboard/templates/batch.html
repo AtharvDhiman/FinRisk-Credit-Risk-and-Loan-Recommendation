@@ -40,7 +40,7 @@
       <a class="btn primary" href="{{ url_for('batch_download') }}">⬇ Download full results (CSV)</a>
     {% else %}
       <div class="placeholder">
-        <p>◆</p>
+        <p><img class="placeholder-logo" src="{{ url_for('static', filename='finrisk_icon.svg') }}" alt=""></p>
         <p>Upload a file to see every applicant scored here.</p>
         <p class="muted">No file handy? Download the template, keep the example row, and upload it back to try it.</p>
       </div>

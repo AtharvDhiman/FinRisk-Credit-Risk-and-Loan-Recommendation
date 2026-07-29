@@ -147,7 +147,7 @@
       {% endif %}
     {% else %}
       <div class="placeholder">
-        <p>◆</p>
+        <p><img class="placeholder-logo" src="{{ url_for('static', filename='finrisk_icon.svg') }}" alt=""></p>
         <p>Fill the form and hit <b>Predict eligibility</b> to see the model's decision.</p>
         <p class="muted">Try a strong profile (credit score 780, income 90,000, no missed payments)
            vs. a weak one (score 600, 3 missed payments, 5 recent enquiries).</p>
