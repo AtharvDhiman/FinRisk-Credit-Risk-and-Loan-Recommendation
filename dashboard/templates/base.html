@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}FinRisk{% endblock %} · Credit Risk Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='finrisk_icon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="logo">◆</span>
+      <img class="logo" src="{{ url_for('static', filename='finrisk_icon.svg') }}" alt="FinRisk logo">
       <span>FinRisk <small>Credit Risk &amp; Loan Recommendation</small></span>
     </div>
     <nav>
