@@ -1,6 +1,13 @@
+/* ============================================================================
+   FinRisk stylesheet.
+   I keep all the colours in one place here as CSS variables (":root" means they
+   work everywhere on the page). This is like a small "design system" -- if I want
+   to change the bank blue, I change it once here and the whole site updates.
+   The theme is a clean bank-portal look: light background, white cards, navy header.
+   ============================================================================ */
 :root {
-  /* Bank-portal light theme */
-  --bg: #eef2f7;
+  /* Bank-portal light theme -- edit these to re-skin the whole app */
+  --bg: #eef2f7;            /* page background */
   --panel: #ffffff;
   --panel-2: #f1f5fa;
   --line: #dbe4ee;

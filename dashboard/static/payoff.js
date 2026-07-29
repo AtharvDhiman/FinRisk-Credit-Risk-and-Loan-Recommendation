@@ -2,21 +2,30 @@
 // attributes on #payoff and lets the user drag the yearly payment to see how many
 // years the debt takes to clear and how much is left each year.
 // Used on both the Live Prediction page and the Customer detail page.
+// Wrapped in an IIFE (a function that runs itself) so my variables don't leak onto
+// the rest of the page.
 (function () {
   var el = document.getElementById('payoff');
-  if (!el) return;
+  if (!el) return;   // this page has no simulator (e.g. a rejected applicant) -> stop
+  // read the loan details Flask put on the HTML element as data-* attributes.
+  // the leading "+" converts the text values into numbers.
   var P = +el.dataset.principal, rate = +el.dataset.rate, income = +el.dataset.income,
       foir = +el.dataset.foir, emi = +el.dataset.emi, tenure = +el.dataset.tenure;
-  var scheduledAnnual = emi * 12;
-  var annualInterest0 = P * (rate / 100);
+  var scheduledAnnual = emi * 12;             // what they'd pay in a year on the normal EMI
+  var annualInterest0 = P * (rate / 100);     // first-year interest if nothing is repaid
+
+  // work out sensible slider limits: never let the payment be so low it can't beat
+  // the interest, and cap the top at 1.6x the normal payment. Rounded to nice 1000s.
   var minPay = Math.max(Math.round(annualInterest0 * 1.12 / 1000) * 1000,
                         Math.round(scheduledAnnual * 0.4 / 1000) * 1000);
   if (minPay >= scheduledAnnual) minPay = Math.round(scheduledAnnual * 0.7 / 1000) * 1000;
   var maxPay = Math.round(scheduledAnnual * 1.6 / 1000) * 1000;
 
   var slider = document.getElementById('pay-slider');
+  // start the slider on the normal EMI amount, between the min and max we just found
   slider.min = minPay; slider.max = maxPay; slider.step = 1000; slider.value = scheduledAnnual;
 
+  // format a number as Indian rupees, e.g. 219100 -> "Rs.2,19,100"
   function inr(x) {
     x = Math.round(x); var neg = x < 0; x = Math.abs(x); var s = '' + x;
     if (s.length > 3) { var last3 = s.slice(-3), rest = s.slice(0, -3), parts = [];
@@ -25,24 +34,28 @@
     return (neg ? '-Rs.' : 'Rs.') + s;
   }
 
+  // The core maths: given how much they pay per year, step through month by month and
+  // see how long it takes to clear the debt. Same amortization logic as the Python side.
   function simulate(annualPayment) {
     var rM = (rate / 100) / 12, pay = annualPayment / 12, bal = P, month = 0;
     var years = [], yP = 0, yI = 0, MAX = 40 * 12, totalInterest = 0;
+    // if the monthly payment can't even cover one month's interest, it never clears
     if (pay <= bal * rM) return { clears: false };
     while (bal > 0 && month < MAX) {
       month++;
-      var interest = bal * rM, principal = pay - interest;
-      if (principal > bal) principal = bal;
+      var interest = bal * rM, principal = pay - interest;  // split payment into two parts
+      if (principal > bal) principal = bal;                 // don't overpay the last month
       bal -= principal; yP += principal; yI += interest; totalInterest += interest;
-      if (month % 12 === 0 || bal <= 0) {
+      if (month % 12 === 0 || bal <= 0) {   // end of a year (or fully paid) -> save a row
         years.push({ year: Math.ceil(month / 12), principal: yP, interest: yI,
                      paid: yP + yI, remaining: Math.max(bal, 0) });
-        yP = 0; yI = 0;
+        yP = 0; yI = 0;                     // reset the yearly counters
       }
     }
     return { clears: bal <= 0, years: years, months: month, totalInterest: totalInterest };
   }
 
+  // give the EMI% a colour zone -- same thresholds as the Python foir_zone().
   function zoneOf(pct) {
     if (pct <= 30) return { label: 'Ideal', cls: 'ideal' };
     if (pct <= 40) return { label: 'Moderate', cls: 'moderate' };
@@ -50,6 +63,7 @@
     return { label: 'High risk', cls: 'high' };
   }
 
+  // redraw everything whenever the slider moves: the summary line + the year-by-year bars
   function render() {
     var annual = +slider.value;
     document.getElementById('pay-label').textContent = inr(annual) + ' / year';
@@ -89,6 +103,6 @@
     }).join('');
   }
 
-  slider.addEventListener('input', render);
-  render();
+  slider.addEventListener('input', render);   // re-run render() every time the slider moves
+  render();                                    // draw once on page load
 })();
