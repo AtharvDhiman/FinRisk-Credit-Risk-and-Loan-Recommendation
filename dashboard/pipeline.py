@@ -36,10 +36,14 @@ ENCODERS = None
 
 # Every selectable model (name -> estimator), so the dashboard can let the user
 # switch models and compare. Loaded from the clf_*/reg_* files notebook 03 saves.
-_CLF_NAMES = ["Gradient Boosting", "Decision Tree", "Random Forest", "Logistic Regression"]
-_REG_NAMES = ["Random Forest Regressor", "Linear Regression"]
+_CLF_NAMES = ["Gradient Boosting", "Decision Tree", "Logistic Regression", "Random Forest"]
+_REG_NAMES = ["Linear Regression", "Random Forest Regressor"]
 
 
+# The trained models are big (the Random Forest is ~69 MB). Loading all of them at
+# startup is slow and uses a lot of memory, which is a problem on free hosting.
+# So this "lazy" dictionary only loads a model from its .joblib file the first time
+# it's actually asked for, and remembers it after that.
 class LazyRegistry(dict):
     def __init__(self, names, prefix):
         super().__init__()
@@ -57,11 +61,26 @@ class LazyRegistry(dict):
 
     def __getitem__(self, key):
         self._load(key)
-        return super().__getitem__(key)
+        if dict.__contains__(self, key):
+            return super().__getitem__(key)
+        # Fallback to lightweight default if specified key failed to load
+        for fallback in self.names:
+            self._load(fallback)
+            if dict.__contains__(self, fallback):
+                return super().__getitem__(fallback)
+        return None
 
     def get(self, key, default=None):
-        self._load(key)
-        return super().get(key, default)
+        if key:
+            self._load(key)
+            if dict.__contains__(self, key):
+                return super().get(key)
+        # Fallback to first available model
+        for fallback in self.names:
+            self._load(fallback)
+            if dict.__contains__(self, fallback):
+                return super().get(fallback)
+        return default
 
     def items(self):
         for name in self.names:
@@ -80,9 +99,9 @@ class LazyRegistry(dict):
 CLASSIFIERS = LazyRegistry(_CLF_NAMES, "clf")
 REGRESSORS = LazyRegistry(_REG_NAMES, "reg")
 
-# Defaults = the best models (first row of the comparison reports)
-DEFAULT_CLF_NAME = pd.read_csv(_p(REPORTS_DIR, "classifier_comparison.csv")).iloc[0]["Model"]
-DEFAULT_REG_NAME = pd.read_csv(_p(REPORTS_DIR, "regressor_comparison.csv")).iloc[0]["Model"]
+# Defaults = best lightweight models for serverless performance
+DEFAULT_CLF_NAME = "Gradient Boosting"
+DEFAULT_REG_NAME = "Linear Regression"
 
 
 class _LazyModelProxy:
@@ -143,25 +162,35 @@ def _mm(value, key):
     return (value - lo) / (hi - lo + 1e-9)
 
 
+# My own 0-100 "credit health" score. Credit_Score alone doesn't tell the full story,
+# so I combine the good signals (high score, old credit history, on-time payments) and
+# subtract the bad ones (missed payments, delinquencies, days-past-due). I use this
+# score later to decide how big a loan someone can safely get.
 def credit_health_score(credit_score, age_oldest_tl, tot_missed, total_tl,
                         num_delinquent, num_30p_dpd):
+    # fraction of trade lines paid on time (1 = never missed). Guard divide-by-zero.
     pay_ratio = 1 - (tot_missed / (total_tl if total_tl else 1))
+    # good signals -- each value is scaled to 0-1 by _mm() then weighted
     positive = (
-        0.5 * _mm(credit_score, "Credit_Score")
-        + 0.3 * _mm(age_oldest_tl, "Age_Oldest_TL")
-        + 0.2 * _mm(pay_ratio, "pay_ratio")
+        0.5 * _mm(credit_score, "Credit_Score")       # credit score matters most
+        + 0.3 * _mm(age_oldest_tl, "Age_Oldest_TL")   # long credit history is good
+        + 0.2 * _mm(pay_ratio, "pay_ratio")           # paying on time is good
     )
+    # bad signals -- these pull the score down
     negative = (
         0.4 * _mm(tot_missed, "Tot_Missed_Pmnt")
         + 0.35 * _mm(num_delinquent, "num_times_delinquent")
         + 0.25 * _mm(num_30p_dpd, "num_times_30p_dpd")
     )
+    # combine, never let it go below 0, and put it on a 0-100 scale
     return round(max(positive - 0.5 * negative, 0.0) * 100, 2)
 
 
 # ---------------------------------------------------------------------------
 # Business calculations
 # ---------------------------------------------------------------------------
+# Turns the 0-100 credit-health score into a 0.6-1.0 multiplier. A weaker profile
+# gets a smaller multiplier, so the recommended loan shrinks for riskier people.
 def risk_adjustment(chs):
     return float(np.clip(0.6 + 0.4 * (chs / 100.0), 0.6, 1.0))
 
@@ -174,37 +203,44 @@ MIN_VIABLE_LOAN = 50000  # below this the income is too low for the product
 IDEAL_FOIR = 0.30
 
 
+# Banks use FOIR (Fixed Obligation to Income Ratio) to decide how much EMI a person
+# can handle. I keep it at 30% for everyone so the loan never eats into essentials.
 def max_foir(net_monthly_income=None):
     """EMI ceiling as a share of net monthly income -- a flat 30% ideal/safe zone for
     all income levels (income arg kept for call compatibility)."""
     return IDEAL_FOIR
 
 
+# Turn an EMI% into a simple label + colour class so the UI can show a green/amber/red tag.
 def foir_zone(emi_pct):
     """Classify an EMI-to-income ratio into an affordability zone (30% is the ideal
     ceiling, so it counts as Ideal)."""
     if emi_pct <= 30:
-        return ("Ideal", "ideal")
+        return ("Ideal", "ideal")       # green -- safe
     if emi_pct <= 40:
         return ("Moderate", "moderate")
     if emi_pct <= 50:
         return ("Caution", "caution")
-    return ("High risk", "high")
+    return ("High risk", "high")        # red -- too much of the salary
 
 
+# Work out the BIGGEST loan whose EMI still fits inside the 30% limit for this income.
+# I rearrange the standard EMI formula to solve for the loan amount (principal).
 def affordable_loan(net_monthly_income, annual_rate_pct, tenure_years):
     """Largest loan whose EMI stays within the FOIR limit for this actual income."""
     if net_monthly_income <= 0:
         return 0.0
-    max_emi = max_foir(net_monthly_income) * net_monthly_income
-    r = (annual_rate_pct / 100.0) / 12.0
-    n = tenure_years * 12
+    max_emi = max_foir(net_monthly_income) * net_monthly_income   # 30% of salary
+    r = (annual_rate_pct / 100.0) / 12.0   # monthly interest rate
+    n = tenure_years * 12                   # number of monthly instalments
     if r == 0:
         return max_emi * n
+    # annuity factor: how many rupees of loan each rupee of monthly EMI can support
     annuity_factor = ((1 + r) ** n - 1) / (r * (1 + r) ** n)
     return max_emi * annuity_factor
 
 
+# Standard bank EMI formula: given a loan, rate and tenure, what's the monthly payment?
 def compute_emi(principal, annual_rate_pct, tenure_years):
     if tenure_years <= 0 or principal <= 0:
         return 0.0
@@ -215,6 +251,9 @@ def compute_emi(principal, annual_rate_pct, tenure_years):
     return principal * r * (1 + r) ** n / ((1 + r) ** n - 1)
 
 
+# Build the year-by-year repayment plan (an "amortization schedule"). I step through
+# each month: interest is charged on the leftover balance, the rest of the EMI reduces
+# the principal, and I add up the totals for each year so the UI can show them.
 def repayment_schedule(principal, annual_rate_pct, tenure_years):
     """Year-by-year amortization for a single loan."""
     emi = compute_emi(principal, annual_rate_pct, tenure_years)
@@ -223,9 +262,9 @@ def repayment_schedule(principal, annual_rate_pct, tenure_years):
     rows = []
     for year in range(1, int(tenure_years) + 1):
         principal_paid = interest_paid = 0.0
-        for _ in range(12):
-            interest = balance * r
-            principal_component = min(emi - interest, balance)
+        for _ in range(12):                       # 12 months in the year
+            interest = balance * r                # interest part of this month's EMI
+            principal_component = min(emi - interest, balance)   # rest pays down the loan
             balance = max(balance - principal_component, 0.0)
             principal_paid += principal_component
             interest_paid += interest
@@ -235,11 +274,14 @@ def repayment_schedule(principal, annual_rate_pct, tenure_years):
             "principal_paid": round(principal_paid),
             "interest_paid": round(interest_paid),
             "total_paid": round(principal_paid + interest_paid),
-            "outstanding": round(balance),
+            "outstanding": round(balance),        # how much debt is still left
         })
     return rows
 
 
+# Write a short plain-English reason for the decision (so the applicant isn't just
+# told "yes/no"). Approved people get their strong points, rejected people get the
+# red flags -- this is the kind of explanation a real lender must give.
 def build_reason(tier, credit_score, income, tot_missed, num_delinquent,
                  age_oldest_tl, enq_l3m):
     reasons = []
@@ -290,15 +332,21 @@ FORM_FIELDS = [
 ]
 
 
+# The model was trained on 68 columns, but the web form only asks the user for 11
+# important ones. This function builds the full 68-column row the model needs: it
+# starts from the "median applicant" and then overwrites the 11 fields the user typed,
+# so the model always gets a complete, valid row to predict on.
 def _prepare_features(inputs: dict):
     """Turn raw form driver values into the full model feature row + the derived
     values reused by the reason/loan logic."""
     row = dict(FEATURE_MEDIANS)  # start from median profile
 
     d = {k: float(inputs[k]) for k, *_ in FORM_FIELDS}
+    # cap very odd incomes (some rows in the data say Rs.18/month) to a sane range
     income_capped = float(np.clip(d["NETMONTHLYINCOME"], INCOME_LOW, INCOME_HIGH))
     active_tl = d["Tot_Active_TL"]
     income_tl_ratio = round(income_capped / (active_tl if active_tl else 1), 2)
+    # my engineered features -- computed the exact same way as in the training notebook
     chs = credit_health_score(d["Credit_Score"], d["Age_Oldest_TL"], d["Tot_Missed_Pmnt"],
                               d["Total_TL"], d["num_times_delinquent"], d["num_times_30p_dpd"])
 
@@ -321,9 +369,13 @@ def _prepare_features(inputs: dict):
     return X, d, income_capped, income_tl_ratio, chs
 
 
+# THIS IS THE MAIN FUNCTION. It takes one applicant's details and returns the full
+# decision: risk tier, approve/reject, recommended loan, EMI, repayment plan and reason.
+# It combines the two ML models with real banking rules (tier caps + affordability).
 def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
     """Score a brand-new applicant. clf_name / reg_name pick which trained model to
     use; when omitted, the best models are used."""
+    # pick which trained model to use (the page lets the user switch between them)
     clf = CLASSIFIERS.get(clf_name, CLASSIFIER)
     reg = REGRESSORS.get(reg_name, REGRESSOR)
     clf_used = clf_name if clf_name in CLASSIFIERS else DEFAULT_CLF_NAME
@@ -331,18 +383,20 @@ def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
 
     X, d, income_capped, income_tl_ratio, chs = _prepare_features(inputs)
 
+    # STEP 1 -- classifier predicts the risk tier (P1 best ... P4 worst) + how sure it is
     tier = str(clf.predict(X)[0])
     proba = clf.predict_proba(X)[0]
     confidence = round(float(proba.max()) * 100, 1)
 
-    rule = TIER_RULES.loc[tier]
-    eligible = tier in ("P1", "P2", "P3")
+    rule = TIER_RULES.loc[tier]                 # the bank's policy row for this tier
+    eligible = tier in ("P1", "P2", "P3")       # P4 = rejected
 
     income_too_low = False
     if eligible:
-        interest = float(rule["Interest_Rate_Pct"])
+        # STEP 2 -- for approved applicants, decide the loan amount.
+        interest = float(rule["Interest_Rate_Pct"])   # rate + tenure come from the tier
         tenure = int(rule["Tenure_Years"])
-        raw_amount = max(float(reg.predict(X)[0]), 0.0)
+        raw_amount = max(float(reg.predict(X)[0]), 0.0)   # regressor's suggested amount
         # cap by tier max AND by affordability. The affordability limit is the 30%
         # ideal-zone EMI scaled by a credit-risk factor (from Credit_Health_Score),
         # so a weaker payment history -> smaller loan, while the EMI stays <= 30%.
@@ -356,15 +410,18 @@ def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
             loan_amount = interest = tenure = emi = total_payable = total_interest = 0
             schedule = []
         else:
+            # STEP 3 -- work out the EMI and the year-by-year repayment plan
             emi = round(compute_emi(loan_amount, interest, tenure))
             schedule = repayment_schedule(loan_amount, interest, tenure)
             total_payable = emi * tenure * 12
             total_interest = max(total_payable - loan_amount, 0)
     else:
+        # rejected applicant -- no loan, so zero everything out
         loan_amount = 0
         interest = tenure = emi = total_payable = total_interest = 0
         schedule = []
 
+    # how big a bite the EMI takes out of the salary, plus the Ideal/Moderate/... label
     net_income = d["NETMONTHLYINCOME"]
     emi_to_income = round(emi / net_income * 100, 1) if net_income > 0 else 0
     foir_limit = round(max_foir(net_income) * 100)
@@ -407,12 +464,14 @@ def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
     }
 
 
+# Runs ALL four classifiers on the same person so the page can show a comparison
+# table. This proves the point that different models can disagree near the cut-off.
 def compare_classifiers(inputs: dict):
     """Run every trained classifier on the same applicant so the user can see
     whether the decision changes between models."""
     X, _, _, _, _ = _prepare_features(inputs)
     rows = []
-    for name, clf in CLASSIFIERS.items():
+    for name, clf in CLASSIFIERS.items():   # ask each model for its verdict
         tier = str(clf.predict(X)[0])
         conf = round(float(clf.predict_proba(X)[0].max()) * 100, 1)
         rows.append({
@@ -656,6 +715,10 @@ def batch_template_df():
     return pd.DataFrame([example], columns=BATCH_TEMPLATE_COLS)
 
 
+# Scores a whole uploaded file at once. The trick for speed is "vectorization":
+# instead of looping row-by-row and calling the model 500 times, I build one big
+# table and call predict() a single time. That took batch scoring from seconds to
+# milliseconds. It also matches the uploaded column names flexibly (case/spelling).
 def score_batch(df_in):
     """Score every row of an uploaded applicant file -- fully vectorized so the whole
     file is run through each model in a single predict() call (not row-by-row).

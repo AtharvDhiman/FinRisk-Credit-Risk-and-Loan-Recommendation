@@ -49,20 +49,23 @@ def favicon():
     return Response(status=204)
 
 
+# Home / Overview page -- shows the portfolio KPIs, tier split and EDA charts.
 @app.route("/")
 def index():
     return render_template("index.html", stats=pl.dashboard_stats(),
                            tier_rules=pl.TIER_RULES.reset_index().to_dict("records"))
 
 
+# Customers page -- searchable, sortable table of all approved applicants.
 @app.route("/customers")
 def customers():
-    query = request.args.get("q", "").strip()
-    sort = request.args.get("sort", "id")
+    query = request.args.get("q", "").strip()      # optional Customer-ID search
+    sort = request.args.get("sort", "id")          # how to order the table
     rows = pl.search_customers(query=query, sort=sort, limit=100)
     return render_template("customers.html", rows=rows, query=query, sort=sort)
 
 
+# Single customer's full detail (loan, EMI, repayment plan). 404 if the id doesn't exist.
 @app.route("/customer/<int:customer_id>")
 def customer_detail(customer_id):
     data = pl.get_customer(customer_id)
@@ -73,6 +76,7 @@ def customer_detail(customer_id):
     return render_template("customer_detail.html", data=data, max_total=max_total)
 
 
+# Live Prediction page. GET shows the empty form; POST scores the submitted applicant.
 @app.route("/predict", methods=["GET", "POST"])
 def predict():
     result = comparison = error = None
@@ -81,12 +85,13 @@ def predict():
     reg_name = request.form.get("reg_name") or pl.DEFAULT_REG_NAME
     if request.method == "POST":
         try:
+            # read every number the user typed, then run the full scoring
             for name, *_ in pl.FORM_FIELDS:
                 values[name] = float(request.form.get(name, ""))
             result = pl.score_applicant(values, clf_name=clf_name, reg_name=reg_name)
-            comparison = pl.compare_classifiers(values)
+            comparison = pl.compare_classifiers(values)   # how every model would decide
         except (ValueError, TypeError):
-            error = "Please enter valid numbers in every field."
+            error = "Please enter valid numbers in every field."   # bad/empty input
     max_total = 1
     if result and result["schedule"]:
         max_total = max(r["total_paid"] for r in result["schedule"]) or 1
@@ -96,16 +101,19 @@ def predict():
                            clf_name=clf_name, reg_name=reg_name)
 
 
+# Model page -- shows how the 4 classifiers / 2 regressors compared + feature importance.
 @app.route("/model")
 def model():
     return render_template("model.html", report=pl.model_report())
 
 
+# Insights page -- approval-rate curves and the bank's risk exposure by tier.
 @app.route("/insights")
 def insights():
     return render_template("insights.html", data=pl.insights_data())
 
 
+# Batch Scoring page. POST reads an uploaded CSV/Excel and scores every row at once.
 @app.route("/batch", methods=["GET", "POST"])
 def batch():
     results = summary = error = warning = None
@@ -148,6 +156,8 @@ def batch():
                            error=error, warning=warning, cols=pl.BATCH_TEMPLATE_COLS)
 
 
+# "View" a single applicant from the last uploaded batch -- re-scores that row and
+# shows the full detail page (same as Live Prediction, but for a batch row).
 @app.route("/batch/applicant/<int:row>")
 def batch_applicant(row):
     if not os.path.exists(BATCH_INPUTS_PATH):
@@ -155,13 +165,14 @@ def batch_applicant(row):
     inputs_df = pd.read_csv(BATCH_INPUTS_PATH)
     if row < 1 or row > len(inputs_df):
         abort(404)
-    inputs = inputs_df.iloc[row - 1].to_dict()
+    inputs = inputs_df.iloc[row - 1].to_dict()   # rows are shown 1-based in the UI
     result = pl.score_applicant(inputs)
     max_total = max((r["total_paid"] for r in result["schedule"]), default=1) or 1
     return render_template("batch_applicant.html", result=result, row=row,
                            inputs=inputs, fields=pl.FORM_FIELDS, max_total=max_total)
 
 
+# Lets the user download a blank CSV with the right column headers to fill in.
 @app.route("/batch/template")
 def batch_template():
     csv = pl.batch_template_df().to_csv(index=False)
@@ -169,6 +180,7 @@ def batch_template():
                     headers={"Content-Disposition": "attachment; filename=applicants_template.csv"})
 
 
+# Download the full scored results of the last batch upload as a CSV.
 @app.route("/batch/download")
 def batch_download():
     if not os.path.exists(BATCH_RESULT_PATH):
@@ -178,13 +190,15 @@ def batch_download():
                                as_attachment=True, download_name="scored_applicants.csv")
 
 
+# Serves the EDA / evaluation chart PNGs from the figures/ folder to the web pages.
 @app.route("/figure/<path:name>")
 def figure(name):
-    if not name.endswith(".png"):
+    if not name.endswith(".png"):     # only allow .png -- basic safety check
         abort(404)
     return send_from_directory(pl.FIGURES_DIR, name)
 
 
+# A small helper the templates use to print money the Indian way (e.g. Rs.1,23,456).
 @app.template_filter("inr")
 def inr(value):
     """Format a number in the Indian numbering system with a Rs. prefix."""
