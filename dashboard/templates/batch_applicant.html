@@ -66,6 +66,15 @@
       </p>
     </div>
 
+    {% if result.score_upside %}
+      {% if result.score_upside.in_top_band %}
+      <p class="score-upside top">✓ Top credit band (750+) — this profile already qualifies for the maximum loan.</p>
+      {% else %}
+      <p class="score-upside">💡 <b>The Difference:</b> raise the credit score to <b>750+</b> to unlock an additional
+        <b>{{ result.score_upside.extra | inr }}</b> upfront — a total of <b>{{ result.score_upside.hi_loan | inr }}</b>.</p>
+      {% endif %}
+    {% endif %}
+
     <h3>Debt payoff simulator</h3>
     <p class="muted" style="margin-top:-4px">Drag the yearly payment to see how many years it takes to
        clear the debt and what's left each year. The scheduled EMI clears it in {{ result.tenure_years }} years.</p>

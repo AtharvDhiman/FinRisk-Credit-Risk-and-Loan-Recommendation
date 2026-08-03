@@ -267,6 +267,9 @@ table.compare { margin: 6px 0 14px; }
 .affordability { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin: 10px 0; }
 .affordability.ok { background: #e7f4ec; border: 1px solid #bfe0cd; color: #14663f; }
 .affordability.warn { background: #fdecea; border: 1px solid #f4c4bf; color: #a52c1c; }
+.score-upside { font-size: 13px; padding: 11px 14px; border-radius: 8px; margin: 10px 0;
+  background: #eef3ff; border: 1px solid #cdddfb; color: #1e3a8a; line-height: 1.5; }
+.score-upside.top { background: #e7f4ec; border-color: #bfe0cd; color: #14663f; }
 
 /* payoff simulator */
 .payoff-control { margin: 8px 0 14px; }

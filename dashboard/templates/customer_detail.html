@@ -47,6 +47,14 @@
         {% endif %}
       </p>
       <p class="reason"><span class="muted">Reason for approval:</span> {{ loan.Reason_For_Approval }}</p>
+      {% if data.score_upside %}
+        {% if data.score_upside.in_top_band %}
+        <p class="score-upside top">✓ Top credit band (750+) — this customer already qualifies for the maximum loan for their profile.</p>
+        {% else %}
+        <p class="score-upside">💡 <b>The Difference:</b> at a <b>750+</b> credit score this customer would unlock an additional
+          <b>{{ data.score_upside.extra | inr }}</b> upfront — a total of <b>{{ data.score_upside.hi_loan | inr }}</b>.</p>
+        {% endif %}
+      {% endif %}
     </section>
 
     <section class="panel">

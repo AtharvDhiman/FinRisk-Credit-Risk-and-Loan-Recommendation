@@ -310,9 +310,13 @@ def _prepare_features(inputs: dict):
 # THIS IS THE MAIN FUNCTION. It takes one applicant's details and returns the full
 # decision: risk tier, approve/reject, recommended loan, EMI, repayment plan and reason.
 # It combines the two ML models with real banking rules (tier caps + affordability).
-def score_applicant(inputs: dict) -> dict:
+def score_applicant(inputs: dict, _with_upside: bool = True) -> dict:
     """Score a brand-new applicant with the best trained models (Gradient Boosting for
-    the risk tier + Random Forest Regressor for the loan amount)."""
+    the risk tier + Random Forest Regressor for the loan amount).
+
+    _with_upside is internal: when True we also compute how much MORE loan the same
+    applicant would get at a top-band (750+) credit score, by re-scoring once with the
+    score bumped up. The recursive call passes False to avoid infinite recursion."""
     X, d, income_capped, income_tl_ratio, chs = _prepare_features(inputs)
 
     # STEP 1 -- classifier predicts the risk tier (P1 best ... P4 worst) + how sure it is
@@ -369,6 +373,20 @@ def score_applicant(inputs: dict) -> dict:
                               d["num_times_delinquent"], d["Age_Oldest_TL"], d["enq_L3m"])
         eligibility_status = rule["Eligibility_Status"]
 
+    # Credit-score upside: how much MORE loan this same applicant would unlock at a
+    # top-band (750+) credit score. Only meaningful for eligible applicants. Because the
+    # regressor is monotonic in credit score, the higher-score loan is always >= this one.
+    score_upside = None
+    if _with_upside and eligible:
+        if d["Credit_Score"] >= 750:
+            score_upside = {"in_top_band": True}
+        else:
+            hi = score_applicant({**inputs, "Credit_Score": 750}, _with_upside=False)
+            if hi["eligible"] and hi["loan_amount"] > loan_amount:
+                score_upside = {"in_top_band": False,
+                                "extra": int(round(hi["loan_amount"] - loan_amount, -2)),
+                                "hi_loan": int(hi["loan_amount"])}
+
     return {
         "tier": tier,
         "tier_label": TIER_META[tier]["label"],
@@ -391,6 +409,7 @@ def score_applicant(inputs: dict) -> dict:
         "net_income": net_income,
         "reason": reason,
         "schedule": schedule,
+        "score_upside": score_upside,
     }
 
 
@@ -485,6 +504,13 @@ def get_customer(customer_id):
     else:
         result["loan"] = None
         result["schedule"] = []
+    # credit-score upside for this existing customer (re-score them through the live model)
+    if result["eligible"]:
+        frow = FEATURED[FEATURED["PROSPECTID"] == cid]
+        if not frow.empty:
+            fr = frow.iloc[0]
+            cust_inputs = {name: float(fr[name]) for name, *_ in FORM_FIELDS}
+            result["score_upside"] = score_applicant(cust_inputs).get("score_upside")
     return result
 
 
