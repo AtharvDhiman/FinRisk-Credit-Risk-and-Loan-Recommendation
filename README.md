@@ -36,32 +36,32 @@ Built on the CIBIL bureau + internal-bank case-study dataset (**51,336 applicant
 ### 📊 Overview — Portfolio at a glance
 Portfolio KPIs, risk-tier split, and the spread of recommended loan sizes across eligible applicants.
 
-![Overview](https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/docs/screenshots/01-overview.png)
+![Overview](docs/screenshots/01-overview.png)
 
 ### 🎯 Live Prediction — Real-time Applicant Scoring
 Enter an applicant profile → receive instant eligibility verdict, model confidence score, risk tier, recommended loan amount, EMI, 30% FOIR affordability check, and interactive **debt-payoff simulator**.
 
-![Live Prediction](https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/docs/screenshots/02-live-prediction.png)
+![Live Prediction](docs/screenshots/02-live-prediction.png)
 
 ### 📈 Insights — Approval Rates & Risk Exposure
 Credit-score decision curve (~650 cutoff threshold), approval rates by income & age segments, and portfolio risk exposure + projected interest income per tier.
 
-![Insights](https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/docs/screenshots/03-insights.png)
+![Insights](docs/screenshots/03-insights.png)
 
 ### 🧠 Model Performance & Evaluation Charts
 Out-of-sample metrics comparing 4 classification and 2 regression algorithms, plus feature importance rankings.
 
-![Model Performance](https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/docs/screenshots/04-model.png)
+![Model Performance](docs/screenshots/04-model.png)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/figures/confusion_matrix.png" width="45%" alt="Confusion Matrix" />
-  <img src="https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/figures/feature_importance.png" width="45%" alt="Feature Importance" />
+  <img src="figures/confusion_matrix.png" width="45%" alt="Confusion Matrix" />
+  <img src="figures/feature_importance.png" width="45%" alt="Feature Importance" />
 </p>
 
 ### ⚡ Batch Scoring — High-Volume File Scoring
 Upload a CSV or Excel file containing hundreds of applicants and export all risk tiers, recommended loans, and EMIs instantly.
 
-![Batch Scoring](https://raw.githubusercontent.com/AtharvDhiman/FinRisk-Credit-Risk-and-Loan-Recommendation/main/docs/screenshots/05-batch-scoring.png)
+![Batch Scoring](docs/screenshots/05-batch-scoring.png)
 
 ---
 
