@@ -16,24 +16,6 @@
   <section class="panel">
     <h2>Applicant profile</h2>
     <form method="post" class="predict-form">
-      <div class="model-select">
-        <label>
-          <span>AI model — approve / reject decision</span>
-          <select name="clf_name">
-            {% for c in choices.classifiers %}
-            <option value="{{ c.name }}" {{ 'selected' if c.name == clf_name }}>{{ c.name }} · {{ c.metric }}{{ ' · best' if c.is_default }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          <span>AI model — loan amount</span>
-          <select name="reg_name">
-            {% for r in choices.regressors %}
-            <option value="{{ r.name }}" {{ 'selected' if r.name == reg_name }}>{{ r.name }} · {{ r.metric }}{{ ' · best' if r.is_default }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      </div>
       {% for name, label, mn, mx, default in fields %}
       <label>
         <span>{{ label }}</span>
@@ -65,29 +47,6 @@
       </div>
 
       <p class="reason"><span class="muted">Reason:</span> {{ result.reason }}</p>
-
-      {% if comparison %}
-      <h3>How every model decides this applicant</h3>
-      <p class="muted" style="margin-top:-4px">Result above uses <b>{{ result.clf_used }}</b>
-         (+ {{ result.reg_used }} for the amount). Pick a different model in the form and
-         re-run to make it active. At clear-cut profiles all models agree; near the cutoff
-         they can differ — and low confidence flags an uncertain call.</p>
-      <div class="table-wrap">
-      <table class="data compare">
-        <thead><tr><th>Classifier</th><th>Tier</th><th>Decision</th><th>Confidence</th></tr></thead>
-        <tbody>
-        {% for m in comparison %}
-        <tr class="{{ 'best' if m.model == result.clf_used }}">
-          <td>{{ m.model }}{{ ' ★' if m.is_default }}</td>
-          <td><span class="pill tier-{{ m.tier }}">{{ m.tier }}</span></td>
-          <td class="{{ 'approved-cell' if m.eligible else 'rejected-cell' }}">{{ m.decision }}</td>
-          <td class="num">{{ m.confidence }}%</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      </div>
-      {% endif %}
 
       {% if result.eligible %}
       <div class="loan-summary">

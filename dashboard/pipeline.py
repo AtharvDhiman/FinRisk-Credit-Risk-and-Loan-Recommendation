@@ -34,90 +34,28 @@ except Exception:
     FEATURE_COLS = []
 ENCODERS = None
 
-# Every selectable model (name -> estimator), so the dashboard can let the user
-# switch models and compare. Loaded from the clf_*/reg_* files notebook 03 saves.
-_CLF_NAMES = ["Gradient Boosting", "Decision Tree", "Logistic Regression", "Random Forest"]
-_REG_NAMES = ["Linear Regression", "Random Forest Regressor"]
-
-
-# The trained models are big (the Random Forest is ~69 MB). Loading all of them at
-# startup is slow and uses a lot of memory, which is a problem on free hosting.
-# So this "lazy" dictionary only loads a model from its .joblib file the first time
-# it's actually asked for, and remembers it after that.
-class LazyRegistry(dict):
-    def __init__(self, names, prefix):
-        super().__init__()
-        self.names = names
-        self.prefix = prefix
-
-    def _load(self, key):
-        if key in self.names and not dict.__contains__(self, key):
-            path = _p(MODELS_DIR, f"{self.prefix}_{key.lower().replace(' ', '_')}.joblib")
-            if os.path.exists(path):
-                try:
-                    dict.__setitem__(self, key, joblib.load(path))
-                except Exception as err:
-                    print(f"Warning: Failed to load model {path}: {err}")
-
-    def __getitem__(self, key):
-        self._load(key)
-        if dict.__contains__(self, key):
-            return super().__getitem__(key)
-        # Fallback to lightweight default if specified key failed to load
-        for fallback in self.names:
-            self._load(fallback)
-            if dict.__contains__(self, fallback):
-                return super().__getitem__(fallback)
-        return None
-
-    def get(self, key, default=None):
-        if key:
-            self._load(key)
-            if dict.__contains__(self, key):
-                return super().get(key)
-        # Fallback to first available model
-        for fallback in self.names:
-            self._load(fallback)
-            if dict.__contains__(self, fallback):
-                return super().get(fallback)
-        return default
-
-    def items(self):
-        for name in self.names:
-            self._load(name)
-        return super().items()
-
-    def values(self):
-        for name in self.names:
-            self._load(name)
-        return super().values()
-
-    def __contains__(self, key):
-        return key in self.names
-
-
-CLASSIFIERS = LazyRegistry(_CLF_NAMES, "clf")
-REGRESSORS = LazyRegistry(_REG_NAMES, "reg")
-
-# Defaults = best lightweight models for serverless performance
-DEFAULT_CLF_NAME = "Gradient Boosting"
-DEFAULT_REG_NAME = "Linear Regression"
-
-
-class _LazyModelProxy:
-    def __init__(self, registry, default_name):
-        self.registry = registry
-        self.default_name = default_name
+# Notebook 03 trains and compares several algorithms, but the app uses only the single
+# BEST model of each type: Gradient Boosting for the risk tier, and the Random Forest
+# Regressor for the loan amount. They are loaded lazily (on first use) because the
+# regressor file is large (~69 MB) -- this keeps dashboard startup fast.
+class _LazyModel:
+    def __init__(self, filename):
+        self.path = _p(MODELS_DIR, filename)
+        self._obj = None
 
     def _get_obj(self):
-        return self.registry.get(self.default_name)
+        if self._obj is None:
+            self._obj = joblib.load(self.path)   # load the .joblib the first time only
+        return self._obj
 
     def __getattr__(self, name):
+        # anything the code asks of the model (.predict, .predict_proba, ...) is
+        # forwarded to the real estimator, loading it on first access.
         return getattr(self._get_obj(), name)
 
 
-CLASSIFIER = _LazyModelProxy(CLASSIFIERS, DEFAULT_CLF_NAME)
-REGRESSOR = _LazyModelProxy(REGRESSORS, DEFAULT_REG_NAME)
+CLASSIFIER = _LazyModel("risk_tier_classifier.joblib")   # Gradient Boosting (best classifier)
+REGRESSOR = _LazyModel("loan_amount_regressor.joblib")   # Random Forest Regressor (best regressor)
 
 FEATURED = pd.read_csv(_p(DATA_DIR, "featured_dataset.csv"))
 
@@ -372,20 +310,14 @@ def _prepare_features(inputs: dict):
 # THIS IS THE MAIN FUNCTION. It takes one applicant's details and returns the full
 # decision: risk tier, approve/reject, recommended loan, EMI, repayment plan and reason.
 # It combines the two ML models with real banking rules (tier caps + affordability).
-def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
-    """Score a brand-new applicant. clf_name / reg_name pick which trained model to
-    use; when omitted, the best models are used."""
-    # pick which trained model to use (the page lets the user switch between them)
-    clf = CLASSIFIERS.get(clf_name, CLASSIFIER)
-    reg = REGRESSORS.get(reg_name, REGRESSOR)
-    clf_used = clf_name if clf_name in CLASSIFIERS else DEFAULT_CLF_NAME
-    reg_used = reg_name if reg_name in REGRESSORS else DEFAULT_REG_NAME
-
+def score_applicant(inputs: dict) -> dict:
+    """Score a brand-new applicant with the best trained models (Gradient Boosting for
+    the risk tier + Random Forest Regressor for the loan amount)."""
     X, d, income_capped, income_tl_ratio, chs = _prepare_features(inputs)
 
     # STEP 1 -- classifier predicts the risk tier (P1 best ... P4 worst) + how sure it is
-    tier = str(clf.predict(X)[0])
-    proba = clf.predict_proba(X)[0]
+    tier = str(CLASSIFIER.predict(X)[0])
+    proba = CLASSIFIER.predict_proba(X)[0]
     confidence = round(float(proba.max()) * 100, 1)
 
     rule = TIER_RULES.loc[tier]                 # the bank's policy row for this tier
@@ -396,7 +328,7 @@ def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
         # STEP 2 -- for approved applicants, decide the loan amount.
         interest = float(rule["Interest_Rate_Pct"])   # rate + tenure come from the tier
         tenure = int(rule["Tenure_Years"])
-        raw_amount = max(float(reg.predict(X)[0]), 0.0)   # regressor's suggested amount
+        raw_amount = max(float(REGRESSOR.predict(X)[0]), 0.0)   # regressor's suggested amount
         # cap by tier max AND by affordability. The affordability limit is the 30%
         # ideal-zone EMI scaled by a credit-risk factor (from Credit_Health_Score),
         # so a weaker payment history -> smaller loan, while the EMI stays <= 30%.
@@ -459,47 +391,7 @@ def score_applicant(inputs: dict, clf_name=None, reg_name=None) -> dict:
         "net_income": net_income,
         "reason": reason,
         "schedule": schedule,
-        "clf_used": clf_used,
-        "reg_used": reg_used,
     }
-
-
-# Runs ALL four classifiers on the same person so the page can show a comparison
-# table. This proves the point that different models can disagree near the cut-off.
-def compare_classifiers(inputs: dict):
-    """Run every trained classifier on the same applicant so the user can see
-    whether the decision changes between models."""
-    X, _, _, _, _ = _prepare_features(inputs)
-    rows = []
-    for name, clf in CLASSIFIERS.items():   # ask each model for its verdict
-        tier = str(clf.predict(X)[0])
-        conf = round(float(clf.predict_proba(X)[0].max()) * 100, 1)
-        rows.append({
-            "model": name,
-            "tier": tier,
-            "tier_label": TIER_META[tier]["label"],
-            "decision": "Approved" if tier in ("P1", "P2", "P3") else "Rejected",
-            "eligible": tier in ("P1", "P2", "P3"),
-            "confidence": conf,
-            "is_default": name == DEFAULT_CLF_NAME,
-        })
-    # keep them in the report's ranked order
-    order = {n: i for i, n in enumerate(_CLF_NAMES)}
-    rows.sort(key=lambda r: order.get(r["model"], 99))
-    return rows
-
-
-def model_choices():
-    """Available models + their validation metric, for the selector dropdowns."""
-    clf_cmp = pd.read_csv(_p(REPORTS_DIR, "classifier_comparison.csv"))
-    reg_cmp = pd.read_csv(_p(REPORTS_DIR, "regressor_comparison.csv"))
-    classifiers = [{"name": r["Model"], "metric": f'{r["Val_Accuracy"]*100:.2f}% acc',
-                    "is_default": r["Model"] == DEFAULT_CLF_NAME}
-                   for _, r in clf_cmp.iterrows() if r["Model"] in CLASSIFIERS]
-    regressors = [{"name": r["Model"], "metric": f'R2 {r["Val_R2"]:.3f}',
-                   "is_default": r["Model"] == DEFAULT_REG_NAME}
-                  for _, r in reg_cmp.iterrows() if r["Model"] in REGRESSORS]
-    return {"classifiers": classifiers, "regressors": regressors}
 
 
 # ---------------------------------------------------------------------------

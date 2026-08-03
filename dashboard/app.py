@@ -79,26 +79,21 @@ def customer_detail(customer_id):
 # Live Prediction page. GET shows the empty form; POST scores the submitted applicant.
 @app.route("/predict", methods=["GET", "POST"])
 def predict():
-    result = comparison = error = None
+    result = error = None
     values = {f[0]: f[4] for f in pl.FORM_FIELDS}  # defaults
-    clf_name = request.form.get("clf_name") or pl.DEFAULT_CLF_NAME
-    reg_name = request.form.get("reg_name") or pl.DEFAULT_REG_NAME
     if request.method == "POST":
         try:
             # read every number the user typed, then run the full scoring
             for name, *_ in pl.FORM_FIELDS:
                 values[name] = float(request.form.get(name, ""))
-            result = pl.score_applicant(values, clf_name=clf_name, reg_name=reg_name)
-            comparison = pl.compare_classifiers(values)   # how every model would decide
+            result = pl.score_applicant(values)   # uses the best trained models
         except (ValueError, TypeError):
             error = "Please enter valid numbers in every field."   # bad/empty input
     max_total = 1
     if result and result["schedule"]:
         max_total = max(r["total_paid"] for r in result["schedule"]) or 1
     return render_template("predict.html", fields=pl.FORM_FIELDS, values=values,
-                           result=result, comparison=comparison, error=error,
-                           max_total=max_total, choices=pl.model_choices(),
-                           clf_name=clf_name, reg_name=reg_name)
+                           result=result, error=error, max_total=max_total)
 
 
 # Model page -- shows how the 4 classifiers / 2 regressors compared + feature importance.

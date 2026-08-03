@@ -25,6 +25,10 @@ data/processed/
 reports/eligible_customers.csv
 dashboard/data/last_batch_results.csv
 
+# Build artifacts / scratch (regenerable, not source)
+output/
+tmp/
+
 # OS
 .DS_Store
 Thumbs.db

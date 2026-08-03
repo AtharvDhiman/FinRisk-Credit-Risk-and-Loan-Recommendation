@@ -39,7 +39,7 @@ Portfolio KPIs, risk-tier split, and the spread of recommended loan sizes.
 ![Overview](docs/screenshots/01-overview.png)
 
 ### Live Prediction — score one applicant in real time
-Enter a profile → get the decision, confidence, recommended loan, EMI, an affordability check, a **model comparison** (see how every algorithm votes), and an interactive **debt-payoff simulator**.
+Enter a profile → get the decision, confidence, recommended loan, EMI, an affordability check, and an interactive **debt-payoff simulator**.
 
 ![Live Prediction](docs/screenshots/02-live-prediction.png)
 
@@ -69,7 +69,6 @@ Upload a CSV/Excel of applicants and download every decision, loan, and EMI.
 |  **Affordability guard (FOIR)** | EMI is kept in the **≤30% ideal zone** so basic needs & savings stay untouched; weaker credit history → smaller loan |
 |  **Year-by-year repayment** | See principal paid, interest paid, and debt remaining each year |
 |  **Payoff simulator** | Drag the yearly payment and watch the payoff period and total interest change live |
-|  **Model selector** | Switch between trained models and compare how each one decides the same applicant |
 |  **Portfolio insights** | Decision curves, segment approval rates, and interest-income exposure |
 |  **Batch scoring** | Score hundreds of applicants from one upload and export the results |
 |  **Plain-language UI** | No banking jargon — labels anyone can read |
