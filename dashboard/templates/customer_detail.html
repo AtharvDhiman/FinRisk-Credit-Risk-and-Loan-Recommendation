@@ -1,3 +1,4 @@
+<!-- Existing-customer page. Data comes from fact_LoanApplication and fact_RepaymentSchedule. -->
 {% extends "base.html" %}
 {% set active = 'customers' %}
 {% block title %}Customer #{{ data.customer_id }}{% endblock %}
@@ -15,6 +16,7 @@
   </p>
 </section>
 
+<!-- Eligible customers show their loan and repayment schedule; other customers show a clear decline state. -->
 {% if data.eligible and data.loan %}
   {% set loan = data.loan %}
   <div class="two-col">
@@ -62,6 +64,7 @@
       <p class="muted" style="margin-top:-4px">Drag the yearly payment to see how many years it
          takes to clear the debt and what's left each year. Paying less each year means more
          years — and more total interest. The scheduled EMI clears it in {{ loan.Tenure_Years }} years.</p>
+      <!-- Values calculated in Python are passed to the interactive JavaScript simulator. -->
       <div id="payoff"
            data-principal="{{ loan.Recommended_Loan_Amount }}"
            data-rate="{{ loan.Interest_Rate_Pct }}"
@@ -86,6 +89,7 @@
     </section>
   </div>
 
+  <!-- Yearly rows are precomputed on the backend, not calculated by the template. -->
   <section class="panel">
     <h2>Scheduled repayment <span class="muted">(paying the full EMI on time — clears in {{ loan.Tenure_Years }} years)</span></h2>
     <div class="table-wrap">

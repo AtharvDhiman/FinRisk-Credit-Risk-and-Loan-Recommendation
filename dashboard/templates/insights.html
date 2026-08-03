@@ -1,3 +1,4 @@
+<!-- Portfolio insight page. All rate tables and exposure totals are prepared by insights_data(). -->
 {% extends "base.html" %}
 {% set active = 'insights' %}
 {% block title %}Insights{% endblock %}
@@ -9,6 +10,7 @@
      base — by credit score, income, age, and risk tier.</p>
 </section>
 
+<!-- Credit-score bands expose the approval threshold used by the trained classifier. -->
 <section class="panel">
   <h2>Decision curve <span class="muted">— approval rate by credit score</span></h2>
   <p class="muted">This is the cutoff in action: below ~650 almost nobody is approved,
@@ -25,6 +27,7 @@
   {% endfor %}
 </section>
 
+<!-- Segment analysis compares approval rates by income and customer age. -->
 <div class="two-col">
   <section class="panel">
     <h2>Approval rate by income segment</h2>
@@ -52,6 +55,7 @@
   </section>
 </div>
 
+<!-- Tier exposure combines recommended loan amounts and projected interest income. -->
 <section class="panel">
   <h2>Risk exposure &amp; projected interest income <span class="muted">by tier</span></h2>
   <div class="table-wrap">

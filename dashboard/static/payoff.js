@@ -4,6 +4,8 @@
 // Used on both the Live Prediction page and the Customer detail page.
 // Wrapped in an IIFE (a function that runs itself) so my variables don't leak onto
 // the rest of the page.
+// Start an isolated scope. This prevents helper variables such as ``rate`` and
+// ``simulate`` from becoming global variables that other scripts could overwrite.
 (function () {
   var el = document.getElementById('payoff');
   if (!el) return;   // this page has no simulator (e.g. a rejected applicant) -> stop
@@ -21,6 +23,7 @@
   if (minPay >= scheduledAnnual) minPay = Math.round(scheduledAnnual * 0.7 / 1000) * 1000;
   var maxPay = Math.round(scheduledAnnual * 1.6 / 1000) * 1000;
 
+  // The HTML page contains this range input only when an applicant is eligible.
   var slider = document.getElementById('pay-slider');
   // start the slider on the normal EMI amount, between the min and max we just found
   slider.min = minPay; slider.max = maxPay; slider.step = 1000; slider.value = scheduledAnnual;
@@ -92,6 +95,7 @@
       '<span class="zone-tag ' + z.cls + '">' + z.label + '</span> zone' +
       (emiPct > 30 ? ' — above the 30% ideal zone, so it starts eating into savings/needs.' : '.');
 
+    // Find the largest yearly payment so each stacked bar can be scaled to 100% width.
     var maxPaid = Math.max.apply(null, sim.years.map(function (y) { return y.paid; }));
     box.innerHTML = sim.years.map(function (y) {
       return '<div class="sched-year"><div class="sched-head"><span>Year ' + y.year +

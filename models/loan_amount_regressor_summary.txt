@@ -1,0 +1,41 @@
+=== LOAN AMOUNT REGRESSOR MODEL SUMMARY ===
+Model Type: RandomForestRegressor
+Number of Decision Trees: 50
+Criterion: squared_error
+Max Depth: 12
+Random State: 42
+
+--- Feature Importances ---
+CC_enq_L12m                         : 0.15%
+GENDER_enc                          : 0.13%
+enq_L3m                             : 0.12%
+Age_Newest_TL                       : 0.07%
+Other_TL                            : 0.04%
+Home_TL                             : 0.04%
+time_since_recent_payment           : 0.04%
+time_since_recent_enq               : 0.04%
+num_lss                             : 0.04%
+pct_tl_open_L6M                     : 0.03%
+recent_level_of_deliq               : 0.03%
+num_sub_6mts                        : 0.02%
+num_sub                             : 0.02%
+last_prod_enq2_enc                  : 0.02%
+Age_Oldest_TL                       : 0.02%
+CC_Flag                             : 0.02%
+Tot_Missed_Pmnt                     : 0.01%
+Time_With_Curr_Empr                 : 0.01%
+pct_tl_closed_L6M                   : 0.01%
+HL_Flag                             : 0.01%
+num_dbt                             : 0.01%
+PL_TL                               : 0.00%
+pct_tl_closed_L12M                  : 0.00%
+EDUCATION_enc                       : 0.00%
+Unsecured_TL                        : 0.00%
+max_recent_level_of_deliq           : 0.00%
+GL_Flag                             : 0.00%
+CC_TL                               : 0.00%
+num_sub_12mts                       : 0.00%
+MARITALSTATUS_enc                   : 0.00%
+Tot_TL_closed_L12M                  : 0.00%
+PL_Flag                             : 0.00%
+first_prod_enq2_enc                 : 0.00%

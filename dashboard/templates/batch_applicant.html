@@ -1,3 +1,4 @@
+<!-- Detail page for one row from the latest batch upload; it reuses the live-score result layout. -->
 {% extends "base.html" %}
 {% set active = 'batch' %}
 {% block title %}Applicant #{{ row }}{% endblock %}
@@ -11,6 +12,7 @@
 </section>
 
 <div class="two-col wide-left">
+  <!-- Show the normalized input values saved during batch processing. -->
   <section class="panel">
     <h2>Applicant profile</h2>
     <table class="mini">
@@ -78,6 +80,7 @@
     <h3>Debt payoff simulator</h3>
     <p class="muted" style="margin-top:-4px">Drag the yearly payment to see how many years it takes to
        clear the debt and what's left each year. The scheduled EMI clears it in {{ result.tenure_years }} years.</p>
+    <!-- JavaScript reads these data values to simulate alternative yearly payments. -->
     <div id="payoff"
          data-principal="{{ result.loan_amount }}"
          data-rate="{{ result.interest_rate }}"

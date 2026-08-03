@@ -1,3 +1,4 @@
+<!-- Overview page: presents portfolio-level results precomputed by dashboard_stats(). -->
 {% extends "base.html" %}
 {% set active = 'home' %}
 {% block title %}Overview{% endblock %}
@@ -10,6 +11,7 @@
      repayment plan.</p>
 </section>
 
+<!-- Key performance indicators provided by the Flask ``stats`` dictionary. -->
 <section class="stat-grid">
   <div class="stat-card">
     <div class="stat-value">{{ "{:,}".format(stats.total_customers) }}</div>
@@ -37,6 +39,7 @@
   </div>
 </section>
 
+<!-- The first column visualizes tier counts; the second renders the policy table. -->
 <div class="two-col">
   <section class="panel">
     <h2>Risk tier distribution</h2>
@@ -80,6 +83,7 @@
   </section>
 </div>
 
+<!-- Loan-size distribution is calculated from eligible customers only. -->
 <section class="panel">
   <h2>Recommended loan-amount spread <span class="muted">(across all {{ "{:,}".format(stats.eligible_customers) }} eligible customers)</span></h2>
   {% set maxband = stats.loan_distribution | map(attribute=1) | max %}
@@ -97,6 +101,7 @@
      Only high-income, low-risk applicants reach the tier caps.</p>
 </section>
 
+<!-- Static images generated during EDA and served through the /figure route. -->
 <section class="panel">
   <h2>Exploratory data analysis</h2>
   <div class="figure-grid">

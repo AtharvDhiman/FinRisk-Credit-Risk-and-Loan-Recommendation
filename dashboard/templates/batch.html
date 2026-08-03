@@ -1,3 +1,4 @@
+<!-- Batch upload page: upload file -> score_batch() -> preview rows -> CSV download. -->
 {% extends "base.html" %}
 {% set active = 'batch' %}
 {% block title %}Batch Scoring{% endblock %}
@@ -14,6 +15,7 @@
 {% if warning %}<div class="alert">⚠ {{ warning }}</div>{% endif %}
 
 <div class="two-col wide-left">
+  <!-- ``cols`` comes from BATCH_TEMPLATE_COLS, so users see the supported headers. -->
   <section class="panel">
     <h2>1. Upload applicants</h2>
     <p class="muted">Your file should have these columns (extra columns are ignored;
@@ -22,6 +24,7 @@
       {% for c in cols %}<span class="code-chip">{{ c }}</span>{% endfor %}
     </div>
     <a class="btn ghost sm" href="{{ url_for('batch_template') }}" style="margin:12px 0; display:inline-block">⬇ Download blank template (CSV)</a>
+    <!-- multipart/form-data is required because this form sends a file, not only text. -->
     <form method="post" enctype="multipart/form-data" class="upload-form">
       <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
       <button type="submit" class="btn primary full">Score all applicants</button>
@@ -29,7 +32,8 @@
   </section>
 
   <section class="panel">
-    {% if summary %}
+<!-- Results appear only after Flask has successfully processed an upload. -->
+{% if summary %}
       <h2>2. Results</h2>
       <div class="stat-grid" style="margin-bottom:16px">
         <div class="stat-card"><div class="stat-value">{{ "{:,}".format(summary.total) }}</div><div class="stat-label">Applicants scored</div></div>

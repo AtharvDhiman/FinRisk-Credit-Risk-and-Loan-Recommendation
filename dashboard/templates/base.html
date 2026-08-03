@@ -1,3 +1,8 @@
+<!--
+  Base Jinja template shared by every dashboard page.
+  Child templates fill the ``title`` and ``content`` blocks below, which avoids
+  repeating the HTML document structure and navigation in every file.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
 </head>
 <body>
+  <!-- Persistent top navigation; ``active`` is set by each child template. -->
   <header class="topbar">
     <div class="brand">
       <img class="logo" src="{{ url_for('static', filename='finrisk_icon.svg') }}" alt="FinRisk logo">
@@ -22,6 +28,7 @@
       <a href="{{ url_for('model') }}" class="{{ 'active' if active=='model' }}">Model</a>
     </nav>
   </header>
+  <!-- Page-specific HTML is inserted here by the child template. -->
   <main>
     {% block content %}{% endblock %}
   </main>

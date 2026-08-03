@@ -1,3 +1,4 @@
+<!-- Live scoring page. A POST submits the 11 understandable applicant inputs to score_applicant(). -->
 {% extends "base.html" %}
 {% set active = 'predict' %}
 {% block title %}Live Prediction{% endblock %}
@@ -13,6 +14,7 @@
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
 <div class="two-col wide-left">
+  <!-- Jinja loops over FORM_FIELDS so labels, limits, and defaults stay aligned with Python. -->
   <section class="panel">
     <h2>Applicant profile</h2>
     <form method="post" class="predict-form">
@@ -28,6 +30,7 @@
     </form>
   </section>
 
+  <!-- The result panel stays as a friendly placeholder until a prediction is returned. -->
   <section class="panel result-panel">
     {% if result %}
       <div class="verdict {{ 'ok' if result.eligible else 'bad' }}">
@@ -90,6 +93,7 @@
          takes to clear the debt and what's left each year. Paying less each year means more
          years — and more total interest. The scheduled EMI clears it in {{ result.tenure_years }} years.</p>
 
+      <!-- data-* attributes pass the Python-calculated loan values to payoff.js safely. -->
       <div id="payoff"
            data-principal="{{ result.loan_amount }}"
            data-rate="{{ result.interest_rate }}"
@@ -111,6 +115,7 @@
         </div>
       </div>
 
+      <!-- Load the browser-only payoff simulator after its required HTML elements. -->
       <script src="{{ url_for('static', filename='payoff.js') }}?v={{ asset_version }}"></script>
       {% endif %}
     {% else %}

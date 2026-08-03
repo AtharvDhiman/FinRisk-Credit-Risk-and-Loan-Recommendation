@@ -1,0 +1,35 @@
+{
+  "MARITALSTATUS": [
+    "Married",
+    "Single"
+  ],
+  "EDUCATION": [
+    "12TH",
+    "GRADUATE",
+    "OTHERS",
+    "POST-GRADUATE",
+    "PROFESSIONAL",
+    "SSC",
+    "UNDER GRADUATE"
+  ],
+  "GENDER": [
+    "F",
+    "M"
+  ],
+  "last_prod_enq2": [
+    "AL",
+    "CC",
+    "ConsumerLoan",
+    "HL",
+    "PL",
+    "others"
+  ],
+  "first_prod_enq2": [
+    "AL",
+    "CC",
+    "ConsumerLoan",
+    "HL",
+    "PL",
+    "others"
+  ]
+}

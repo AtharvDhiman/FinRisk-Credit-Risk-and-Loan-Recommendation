@@ -1,0 +1,21 @@
+=== RISK TIER CLASSIFIER MODEL SUMMARY ===
+Model Type: GradientBoostingClassifier
+Classes: ['P1' 'P2' 'P3' 'P4']
+Number of Estimators: 100
+
+--- Top 15 Feature Importances ---
+Credit_Score                        : 99.90%
+time_since_recent_payment           : 0.01%
+Credit_Health_Score                 : 0.01%
+NETMONTHLYINCOME_Capped             : 0.01%
+time_since_recent_enq               : 0.01%
+enq_L3m                             : 0.01%
+Other_TL                            : 0.01%
+Total_TL                            : 0.00%
+recent_level_of_deliq               : 0.00%
+Age_Newest_TL                       : 0.00%
+AGE                                 : 0.00%
+pct_tl_closed_L12M                  : 0.00%
+EDUCATION_enc                       : 0.00%
+Time_With_Curr_Empr                 : 0.00%
+num_times_30p_dpd                   : 0.00%
