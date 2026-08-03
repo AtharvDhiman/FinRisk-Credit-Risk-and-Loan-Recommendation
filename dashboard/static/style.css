@@ -168,22 +168,23 @@ main { max-width: 1360px; margin: 0 auto; padding: 36px 44px 80px; }
 
 /* ---- tables ---- */
 table { width: 100%; border-collapse: collapse; }
-table.mini td { padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+table.mini td { padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 15.5px; vertical-align: middle; }
 table.mini td:first-child { color: var(--muted); }
 table.mini td:last-child { text-align: right; }
-table.mini thead th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px; padding: 7px 4px; }
+table.mini thead th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px; padding: 7px 4px; vertical-align: middle; }
+table.mini th.num, table.mini td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.data { font-size: 15px; }
 table.data th {
   text-align: left; color: var(--muted); font-weight: 600; font-size: 13px;
   padding: 12px; border-bottom: 2px solid var(--line); text-transform: uppercase; letter-spacing: .03em;
-  background: var(--panel-2);
+  background: var(--panel-2); vertical-align: middle;
 }
-table.data td { padding: 12px; border-bottom: 1px solid var(--line); }
+table.data td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 table.data tr:hover td { background: var(--panel-2); }
-table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data th.num, table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.data tr.best td { background: rgba(18,68,138,.06); }
 .tag { font-size: 10px; background: var(--accent); color: #fff; padding: 1px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
-.reason-cell { color: var(--muted); font-size: 12.5px; max-width: 320px; }
+.reason-cell { color: var(--muted); font-size: 12.5px; max-width: 320px; text-align: left; }
 .table-wrap { overflow-x: auto; }
 
 /* ---- forms ---- */

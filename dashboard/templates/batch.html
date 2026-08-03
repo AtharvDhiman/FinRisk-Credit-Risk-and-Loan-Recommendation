@@ -54,8 +54,18 @@
   <div class="table-wrap">
   <table class="data">
     <thead>
-      <tr><th>Row</th><th>Credit Score</th><th>Income</th><th>Tier</th><th>Decision</th>
-          <th>Confidence</th><th>Recommended Loan</th><th>EMI</th><th>Reason</th><th></th></tr>
+      <tr>
+        <th>Row</th>
+        <th class="num">Credit Score</th>
+        <th class="num">Income</th>
+        <th>Tier</th>
+        <th>Decision</th>
+        <th class="num">Confidence</th>
+        <th class="num">Recommended Loan</th>
+        <th class="num">EMI</th>
+        <th>Reason</th>
+        <th class="num"></th>
+      </tr>
     </thead>
     <tbody>
       {% for r in results %}
@@ -69,7 +79,7 @@
         <td class="num">{{ r.Recommended_Loan | inr }}</td>
         <td class="num">{{ r.Monthly_EMI | inr }}</td>
         <td class="reason-cell">{{ r.Reason }}</td>
-        <td><a class="btn ghost sm" href="{{ url_for('batch_applicant', row=r.Row) }}">View →</a></td>
+        <td class="num"><a class="btn ghost sm" href="{{ url_for('batch_applicant', row=r.Row) }}">View →</a></td>
       </tr>
       {% endfor %}
     </tbody>

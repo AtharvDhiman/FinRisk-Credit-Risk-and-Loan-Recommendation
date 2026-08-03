@@ -57,16 +57,22 @@
     <h2>Loan policy by tier</h2>
     <table class="mini">
       <thead>
-        <tr><th>Tier</th><th>Status</th><th>Max loan</th><th>Rate</th><th>Tenure</th></tr>
+        <tr>
+          <th>Tier</th>
+          <th>Status</th>
+          <th class="num">Max loan</th>
+          <th class="num">Rate</th>
+          <th class="num">Tenure</th>
+        </tr>
       </thead>
       <tbody>
         {% for r in tier_rules %}
         <tr>
           <td><span class="pill tier-{{ r.RiskTierID }}">{{ r.RiskTierID }}</span></td>
           <td>{{ r.Eligibility_Status }}</td>
-          <td>{{ r.Max_Loan_Amount | inr }}</td>
-          <td>{{ r.Interest_Rate_Pct }}%</td>
-          <td>{{ r.Tenure_Years }} yr</td>
+          <td class="num">{{ r.Max_Loan_Amount | inr }}</td>
+          <td class="num">{{ r.Interest_Rate_Pct }}%</td>
+          <td class="num">{{ r.Tenure_Years }} yr</td>
         </tr>
         {% endfor %}
       </tbody>

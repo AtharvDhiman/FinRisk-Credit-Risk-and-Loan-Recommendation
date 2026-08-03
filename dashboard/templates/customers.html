@@ -31,8 +31,14 @@
 <table class="data">
   <thead>
     <tr>
-      <th>Customer ID</th><th>Tier</th><th>Recommended loan</th>
-      <th>Rate</th><th>Tenure</th><th>Monthly EMI</th><th>Reason</th><th></th>
+      <th>Customer ID</th>
+      <th>Tier</th>
+      <th class="num">Recommended loan</th>
+      <th class="num">Rate</th>
+      <th class="num">Tenure</th>
+      <th class="num">Monthly EMI</th>
+      <th>Reason</th>
+      <th class="num"></th>
     </tr>
   </thead>
   <tbody>
@@ -45,7 +51,7 @@
       <td class="num">{{ r.Tenure_Years }} yr</td>
       <td class="num">{{ r.Monthly_EMI | inr }}</td>
       <td class="reason-cell">{{ r.Reason_For_Approval }}</td>
-      <td><a class="btn ghost sm" href="{{ url_for('customer_detail', customer_id=r.CustomerID) }}">View →</a></td>
+      <td class="num"><a class="btn ghost sm" href="{{ url_for('customer_detail', customer_id=r.CustomerID) }}">View →</a></td>
     </tr>
     {% endfor %}
   </tbody>

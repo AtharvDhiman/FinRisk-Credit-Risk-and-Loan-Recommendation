@@ -14,7 +14,7 @@
   <section class="panel">
     <h2>Risk-tier model <span class="muted">(Gradient Boosting)</span></h2>
     <table class="data">
-      <thead><tr><th>Algorithm</th><th>Val. accuracy</th><th>Val. F1 (macro)</th></tr></thead>
+      <thead><tr><th>Algorithm</th><th class="num">Val. accuracy</th><th class="num">Val. F1 (macro)</th></tr></thead>
       <tbody>
         {% for r in report.classifier_comparison %}
         <tr class="{{ 'best' if loop.first }}">
@@ -30,7 +30,7 @@
   <section class="panel">
     <h2>Loan-amount model <span class="muted">(Random Forest)</span></h2>
     <table class="data">
-      <thead><tr><th>Algorithm</th><th>Val. R²</th><th>Val. MAE</th></tr></thead>
+      <thead><tr><th>Algorithm</th><th class="num">Val. R²</th><th class="num">Val. MAE</th></tr></thead>
       <tbody>
         {% for r in report.regressor_comparison %}
         <tr class="{{ 'best' if loop.first }}">

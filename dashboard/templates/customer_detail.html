@@ -83,8 +83,14 @@
     <div class="table-wrap">
     <table class="data">
       <thead>
-        <tr><th>Year</th><th>EMI / month</th><th>Principal paid</th><th>Interest paid</th>
-            <th>Total paid</th><th>Outstanding balance</th></tr>
+        <tr>
+          <th>Year</th>
+          <th class="num">EMI / month</th>
+          <th class="num">Principal paid</th>
+          <th class="num">Interest paid</th>
+          <th class="num">Total paid</th>
+          <th class="num">Outstanding balance</th>
+        </tr>
       </thead>
       <tbody>
         {% for row in data.schedule %}
