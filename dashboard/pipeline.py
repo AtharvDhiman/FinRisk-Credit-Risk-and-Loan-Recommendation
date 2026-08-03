@@ -332,13 +332,19 @@ def score_applicant(inputs: dict, _with_upside: bool = True) -> dict:
         # STEP 2 -- for approved applicants, decide the loan amount.
         interest = float(rule["Interest_Rate_Pct"])   # rate + tenure come from the tier
         tenure = int(rule["Tenure_Years"])
-        raw_amount = max(float(REGRESSOR.predict(X)[0]), 0.0)   # regressor's suggested amount
-        # cap by tier max AND by affordability. The affordability limit is the 30%
-        # ideal-zone EMI scaled by a credit-risk factor (from Credit_Health_Score),
-        # so a weaker payment history -> smaller loan, while the EMI stays <= 30%.
+        # Size by the transparent lending policy -- the same target the Random Forest was
+        # trained to reproduce -- rather than the model's point estimate. The smallest of:
+        #  1) income multiple (annual income x tier multiplier),
+        #  2) the tier's maximum cap,
+        #  3) the 30%-EMI affordability limit on the applicant's real income,
+        # each scaled by a credit-risk factor from Credit_Health_Score. Applying the policy
+        # directly lets the loan scale with real income; the model, trained on income capped
+        # at the 99th percentile, is blind to income above that and would flatten every
+        # high earner to the same amount.
         risk_adj = risk_adjustment(chs)
+        by_income = income_capped * 12 * float(rule["Income_Multiplier"]) * risk_adj
         affordable = affordable_loan(d["NETMONTHLYINCOME"], interest, tenure) * risk_adj
-        loan_amount = round(min(raw_amount, rule["Max_Loan_Amount"], affordable), -2)
+        loan_amount = round(min(by_income, rule["Max_Loan_Amount"], affordable), -2)
         if loan_amount < MIN_VIABLE_LOAN:
             # income can't support the minimum ticket size -> decline
             eligible = False
@@ -693,25 +699,27 @@ def score_batch(df_in):
         if col in X.columns:
             X[col] = vals
 
-    # 3. ONE predict() per model on the whole batch
+    # 3. ONE predict() for the risk tier + confidence (loan is sized by policy, below)
     tiers = CLASSIFIER.predict(X).astype(str)
     confidence = np.round(CLASSIFIER.predict_proba(X).max(axis=1) * 100, 1)
-    raw_amount = np.maximum(REGRESSOR.predict(X), 0.0)
 
     # 4. Per-tier rule arrays
     rate = np.array([float(TIER_RULES.loc[t, "Interest_Rate_Pct"]) for t in tiers])
     tenure = np.array([int(TIER_RULES.loc[t, "Tenure_Years"]) for t in tiers])
     max_loan = np.array([float(TIER_RULES.loc[t, "Max_Loan_Amount"]) for t in tiers])
+    mult = np.array([float(TIER_RULES.loc[t, "Income_Multiplier"]) for t in tiers])
     eligible = np.isin(tiers, ["P1", "P2", "P3"])
 
-    # 5. Loan amount = min(regressor, tier cap, risk-adjusted affordability)
+    # 5. Loan amount = min(income multiple, tier cap, risk-adjusted affordability) -- the
+    #    lending policy applied on real income, so the loan scales with income.
     risk_adj = np.clip(0.6 + 0.4 * (chs / 100.0), 0.6, 1.0)
     r_m = (rate / 100.0) / 12.0
     n_m = tenure * 12
     with np.errstate(divide="ignore", invalid="ignore"):
         annuity = ((1 + r_m) ** n_m - 1) / (r_m * (1 + r_m) ** n_m)
+    by_income = income_capped * 12 * mult * risk_adj
     affordable = np.where(income > 0, IDEAL_FOIR * income * annuity, 0.0) * risk_adj
-    loan = np.round(np.minimum(np.minimum(raw_amount, max_loan), affordable), -2)
+    loan = np.round(np.minimum(np.minimum(by_income, max_loan), affordable), -2)
     loan = np.where(eligible, loan, 0.0)
 
     # minimum-viable-loan gate
