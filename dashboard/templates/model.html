@@ -5,14 +5,14 @@
 
 <section class="hero compact">
   <h1>Model performance</h1>
-  <p>Both models were selected by comparing several algorithms on a held-out validation
-     set, then confirmed on an untouched test set — the metrics below are honest
-     out-of-sample results, not training scores.</p>
+  <p>Each model was evaluated on a held-out validation set, then confirmed on an
+     untouched test set — the metrics below are honest out-of-sample results, not
+     training scores.</p>
 </section>
 
 <div class="two-col">
   <section class="panel">
-    <h2>Classifier comparison <span class="muted">(risk tier)</span></h2>
+    <h2>Risk-tier model <span class="muted">(Gradient Boosting)</span></h2>
     <table class="data">
       <thead><tr><th>Algorithm</th><th>Val. accuracy</th><th>Val. F1 (macro)</th></tr></thead>
       <tbody>
@@ -28,7 +28,7 @@
   </section>
 
   <section class="panel">
-    <h2>Regressor comparison <span class="muted">(loan amount)</span></h2>
+    <h2>Loan-amount model <span class="muted">(Random Forest)</span></h2>
     <table class="data">
       <thead><tr><th>Algorithm</th><th>Val. R²</th><th>Val. MAE</th></tr></thead>
       <tbody>
@@ -73,7 +73,6 @@
   <h2>Evaluation charts</h2>
   <div class="figure-grid">
     <figure><img src="{{ url_for('figure', name='confusion_matrix.png') }}" alt="Confusion matrix"><figcaption>Confusion matrix (test set)</figcaption></figure>
-    <figure><img src="{{ url_for('figure', name='classifier_comparison.png') }}" alt="Classifier comparison"><figcaption>Classifier accuracy comparison</figcaption></figure>
     <figure><img src="{{ url_for('figure', name='feature_importance.png') }}" alt="Feature importance"><figcaption>Feature importances</figcaption></figure>
     <figure><img src="{{ url_for('figure', name='loan_amount_regression.png') }}" alt="Regression fit"><figcaption>Loan-amount predicted vs. target</figcaption></figure>
   </div>
